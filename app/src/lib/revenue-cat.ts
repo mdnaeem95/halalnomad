@@ -59,7 +59,8 @@ export async function checkPremiumStatus(): Promise<boolean> {
   try {
     const customerInfo = await Purchases.getCustomerInfo();
     return customerInfo.entitlements.active['HalalNomad Premium'] !== undefined;
-  } catch {
+  } catch (e) {
+    console.warn('RevenueCat getCustomerInfo failed:', e);
     return false;
   }
 }
@@ -71,9 +72,13 @@ export async function getOfferings(): Promise<PurchasesPackage[]> {
   try {
     const offerings = await Purchases.getOfferings();
     const current = offerings.current;
-    if (!current) return [];
+    if (!current) {
+      console.warn('RevenueCat: no current offering configured');
+      return [];
+    }
     return current.availablePackages;
-  } catch {
+  } catch (e) {
+    console.warn('RevenueCat getOfferings failed:', e);
     return [];
   }
 }

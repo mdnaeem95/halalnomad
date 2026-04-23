@@ -9,11 +9,10 @@ import { useTheme } from '../../src/hooks/useTheme';
 import { useAppStore } from '../../src/stores/app-store';
 import { TierBadge } from '../../src/components/TierBadge';
 import { TIER_THRESHOLDS, ContributorTier } from '../../src/types';
-import { ColorScheme } from '../../src/constants/theme';
+import { AppColors, ColorScheme } from '../../src/constants/theme';
 import { SUPPORTED_LANGUAGES, SupportedLanguage } from '../../src/i18n';
 import {
   borderRadius,
-  colors,
   shadows,
   spacing,
   typography,
@@ -32,12 +31,13 @@ export default function ProfileScreen() {
   const setLanguage = useAppStore((s) => s.setLanguage);
   const { isPremium } = usePremium();
   const { colors: c, colorScheme, setColorScheme } = useTheme();
+  const styles = React.useMemo(() => createStyles(c), [c]);
 
   if (!user || !profile) {
     return (
       <View style={styles.centered}>
         <View style={styles.iconCircle}>
-          <Ionicons name="person-outline" size={36} color={colors.primaryLight} />
+          <Ionicons name="person-outline" size={36} color={c.primaryLight} />
         </View>
         <Text style={styles.title}>{t('profile.joinTitle')}</Text>
         <Text style={styles.subtitle}>{t('profile.joinSubtitle')}</Text>
@@ -94,8 +94,8 @@ export default function ProfileScreen() {
     : 1;
 
   return (
-    <ScrollView style={[styles.container, { backgroundColor: c.background }]} contentContainerStyle={styles.scrollContent}>
-      <View style={[styles.profileCard, { backgroundColor: c.surface }]}>
+    <ScrollView style={styles.container} contentContainerStyle={styles.scrollContent}>
+      <View style={styles.profileCard}>
         <View style={styles.avatar}>
           <Text style={styles.avatarText}>
             {profile.display_name.charAt(0).toUpperCase()}
@@ -106,7 +106,7 @@ export default function ProfileScreen() {
         <TierBadge tier={profile.tier} />
       </View>
 
-      <View style={[styles.statsCard, { backgroundColor: c.surface }]}>
+      <View style={styles.statsCard}>
         <Text style={styles.sectionTitle}>{t('profile.contributorPoints')}</Text>
         <Text style={styles.points}>{profile.points}</Text>
 
@@ -167,7 +167,7 @@ export default function ProfileScreen() {
           accessibilityLabel="Upgrade to HalalNomad Premium"
         >
           <View style={styles.premiumIcon}>
-            <Ionicons name="star" size={24} color={colors.accent} />
+            <Ionicons name="star" size={24} color={c.accent} />
           </View>
           <View style={styles.premiumText}>
             <Text style={styles.premiumTitle}>HalalNomad Premium</Text>
@@ -175,18 +175,18 @@ export default function ProfileScreen() {
               Offline maps, advanced filters, trip planning & more
             </Text>
           </View>
-          <Ionicons name="chevron-forward" size={20} color={colors.textTertiary} />
+          <Ionicons name="chevron-forward" size={20} color={c.textTertiary} />
         </Pressable>
       )}
       {isPremium && (
         <View style={styles.premiumActiveCard}>
-          <Ionicons name="star" size={20} color={colors.accent} />
+          <Ionicons name="star" size={20} color={c.accent} />
           <Text style={styles.premiumActiveText}>Premium Active</Text>
         </View>
       )}
 
       {/* Language selector */}
-      <View style={[styles.settingsCard, { backgroundColor: c.surface }]}>
+      <View style={styles.settingsCard}>
         <Text style={styles.sectionTitle}>Language</Text>
         <View style={styles.languageRow}>
           {(Object.entries(SUPPORTED_LANGUAGES) as [SupportedLanguage, string][]).map(
@@ -211,7 +211,7 @@ export default function ProfileScreen() {
       </View>
 
       {/* Theme selector */}
-      <View style={[styles.settingsCard, { backgroundColor: c.surface }]}>
+      <View style={styles.settingsCard}>
         <Text style={styles.sectionTitle}>Theme</Text>
         <View style={styles.themeToggle}>
           {([
@@ -235,7 +235,7 @@ export default function ProfileScreen() {
                 <Ionicons
                   name={item.icon}
                   size={18}
-                  color={isActive ? colors.primary : colors.textTertiary}
+                  color={isActive ? c.primary : c.textTertiary}
                 />
                 <Text
                   style={[
@@ -274,10 +274,10 @@ export default function ProfileScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (c: AppColors) => StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: colors.background,
+    backgroundColor: c.background,
   },
   scrollContent: {
     padding: spacing.md,
@@ -288,30 +288,31 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     padding: spacing.xl,
+    backgroundColor: c.background,
   },
   iconCircle: {
     width: 80,
     height: 80,
     borderRadius: 40,
-    backgroundColor: colors.primaryLight + '20',
+    backgroundColor: c.primaryLight + '20',
     justifyContent: 'center',
     alignItems: 'center',
     marginBottom: spacing.lg,
   },
   title: {
     ...typography.h2,
-    color: colors.textPrimary,
+    color: c.textPrimary,
     marginBottom: spacing.sm,
   },
   subtitle: {
     ...typography.body,
-    color: colors.textSecondary,
+    color: c.textSecondary,
     textAlign: 'center',
     marginBottom: spacing.lg,
     lineHeight: 24,
   },
   primaryButton: {
-    backgroundColor: colors.primary,
+    backgroundColor: c.primary,
     borderRadius: borderRadius.md,
     paddingVertical: 14,
     paddingHorizontal: spacing.xxl,
@@ -321,7 +322,7 @@ const styles = StyleSheet.create({
   },
   primaryButtonText: {
     ...typography.label,
-    color: colors.white,
+    color: c.textOnPrimary,
     fontSize: 16,
   },
   secondaryButton: {
@@ -331,15 +332,15 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     width: '100%',
     borderWidth: 1,
-    borderColor: colors.primary,
+    borderColor: c.primary,
   },
   secondaryButtonText: {
     ...typography.label,
-    color: colors.primary,
+    color: c.primary,
     fontSize: 16,
   },
   profileCard: {
-    backgroundColor: colors.white,
+    backgroundColor: c.surface,
     borderRadius: borderRadius.lg,
     padding: spacing.lg,
     alignItems: 'center',
@@ -350,32 +351,32 @@ const styles = StyleSheet.create({
     width: 72,
     height: 72,
     borderRadius: 36,
-    backgroundColor: colors.primary,
+    backgroundColor: c.primary,
     justifyContent: 'center',
     alignItems: 'center',
     marginBottom: spacing.sm,
   },
   avatarText: {
     ...typography.h1,
-    color: colors.white,
+    color: c.textOnPrimary,
   },
   displayName: {
     ...typography.h2,
-    color: colors.textPrimary,
+    color: c.textPrimary,
   },
   email: {
     ...typography.bodySmall,
-    color: colors.textTertiary,
+    color: c.textTertiary,
   },
   statsCard: {
-    backgroundColor: colors.white,
+    backgroundColor: c.surface,
     borderRadius: borderRadius.lg,
     padding: spacing.lg,
     marginTop: spacing.md,
     ...shadows.md,
   },
   settingsCard: {
-    backgroundColor: colors.white,
+    backgroundColor: c.surface,
     borderRadius: borderRadius.lg,
     padding: spacing.lg,
     marginTop: spacing.md,
@@ -383,14 +384,14 @@ const styles = StyleSheet.create({
   },
   sectionTitle: {
     ...typography.label,
-    color: colors.textSecondary,
+    color: c.textSecondary,
     textTransform: 'uppercase',
     letterSpacing: 1,
   },
   points: {
     fontSize: 48,
     fontWeight: '700',
-    color: colors.primary,
+    color: c.primary,
     marginVertical: spacing.sm,
   },
   progressSection: {
@@ -398,18 +399,18 @@ const styles = StyleSheet.create({
   },
   progressLabel: {
     ...typography.caption,
-    color: colors.textSecondary,
+    color: c.textSecondary,
     marginBottom: spacing.xs,
   },
   progressBar: {
     height: 6,
-    backgroundColor: colors.divider,
+    backgroundColor: c.divider,
     borderRadius: 3,
     overflow: 'hidden',
   },
   progressFill: {
     height: '100%',
-    backgroundColor: colors.accent,
+    backgroundColor: c.accent,
     borderRadius: 3,
   },
   pointsBreakdown: {
@@ -418,7 +419,7 @@ const styles = StyleSheet.create({
   },
   breakdownTitle: {
     ...typography.label,
-    color: colors.textPrimary,
+    color: c.textPrimary,
     marginBottom: spacing.xs,
   },
   breakdownRow: {
@@ -427,11 +428,11 @@ const styles = StyleSheet.create({
   },
   breakdownLabel: {
     ...typography.bodySmall,
-    color: colors.textSecondary,
+    color: c.textSecondary,
   },
   breakdownValue: {
     ...typography.label,
-    color: colors.primaryLight,
+    color: c.primaryLight,
   },
   languageSection: {
     marginTop: spacing.xl,
@@ -439,7 +440,7 @@ const styles = StyleSheet.create({
   },
   languageTitle: {
     ...typography.label,
-    color: colors.textSecondary,
+    color: c.textSecondary,
     textTransform: 'uppercase',
     letterSpacing: 1,
     marginBottom: spacing.sm,
@@ -450,24 +451,24 @@ const styles = StyleSheet.create({
     gap: spacing.sm,
   },
   langChip: {
-    backgroundColor: colors.white,
+    backgroundColor: c.background,
     borderRadius: 20,
     paddingHorizontal: 16,
     paddingVertical: 8,
     borderWidth: 1,
-    borderColor: colors.border,
+    borderColor: c.border,
   },
   langChipActive: {
-    backgroundColor: colors.primary,
-    borderColor: colors.primary,
+    backgroundColor: c.primary,
+    borderColor: c.primary,
   },
   langChipText: {
     ...typography.bodySmall,
-    color: colors.textSecondary,
+    color: c.textSecondary,
     fontWeight: '600',
   },
   langChipTextActive: {
-    color: colors.white,
+    color: c.textOnPrimary,
   },
   signOutButton: {
     marginTop: spacing.lg,
@@ -476,7 +477,7 @@ const styles = StyleSheet.create({
   },
   signOutText: {
     ...typography.label,
-    color: colors.error,
+    color: c.error,
   },
   legalLinks: {
     flexDirection: 'row',
@@ -487,16 +488,16 @@ const styles = StyleSheet.create({
   },
   legalLink: {
     ...typography.caption,
-    color: colors.primary,
+    color: c.primary,
     fontWeight: '600',
   },
   legalDot: {
     ...typography.caption,
-    color: colors.textTertiary,
+    color: c.textTertiary,
   },
   themeToggle: {
     flexDirection: 'row',
-    backgroundColor: colors.divider,
+    backgroundColor: c.divider,
     borderRadius: borderRadius.md,
     padding: 3,
     marginTop: spacing.sm,
@@ -511,7 +512,7 @@ const styles = StyleSheet.create({
     borderRadius: borderRadius.sm,
   },
   themeOptionActive: {
-    backgroundColor: colors.white,
+    backgroundColor: c.surface,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 1 },
     shadowOpacity: 0.1,
@@ -520,14 +521,14 @@ const styles = StyleSheet.create({
   },
   themeLabel: {
     ...typography.caption,
-    color: colors.textTertiary,
+    color: c.textTertiary,
     fontWeight: '600',
   },
   themeLabelActive: {
-    color: colors.primary,
+    color: c.primary,
   },
   premiumCard: {
-    backgroundColor: colors.white,
+    backgroundColor: c.surface,
     borderRadius: borderRadius.lg,
     padding: spacing.md,
     marginTop: spacing.md,
@@ -535,14 +536,14 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: spacing.md,
     borderWidth: 1,
-    borderColor: colors.accent + '40',
+    borderColor: c.accent + '40',
     ...shadows.md,
   },
   premiumIcon: {
     width: 44,
     height: 44,
     borderRadius: 22,
-    backgroundColor: colors.accent + '18',
+    backgroundColor: c.accent + '18',
     justifyContent: 'center',
     alignItems: 'center',
   },
@@ -552,16 +553,16 @@ const styles = StyleSheet.create({
   },
   premiumTitle: {
     ...typography.label,
-    color: colors.textPrimary,
+    color: c.textPrimary,
     fontSize: 15,
   },
   premiumDesc: {
     ...typography.caption,
-    color: colors.textSecondary,
+    color: c.textSecondary,
     lineHeight: 18,
   },
   premiumActiveCard: {
-    backgroundColor: colors.accent + '12',
+    backgroundColor: c.accent + '12',
     borderRadius: borderRadius.lg,
     padding: spacing.md,
     marginTop: spacing.md,
@@ -572,6 +573,6 @@ const styles = StyleSheet.create({
   },
   premiumActiveText: {
     ...typography.label,
-    color: colors.accent,
+    color: c.accent,
   },
 });

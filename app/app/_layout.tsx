@@ -11,9 +11,11 @@ import { useNotifications } from '../src/hooks/useNotifications';
 import { ErrorBoundary } from '../src/components/ErrorBoundary';
 import { OfflineBanner } from '../src/components/OfflineBanner';
 import { initSentry } from '../src/lib/sentry';
+import { initRevenueCat } from '../src/lib/revenue-cat';
 import '../src/i18n';
 
 initSentry();
+initRevenueCat();
 
 function AppStack() {
   const { t } = useTranslation();

@@ -3,6 +3,7 @@ import { Session, User } from '@supabase/supabase-js';
 import { supabase } from '../lib/supabase';
 import { setSentryUser } from '../lib/sentry';
 import { identifyUser, resetAnalytics } from '../lib/analytics';
+import { loginRevenueCat, logoutRevenueCat } from '../lib/revenue-cat';
 import { ContributorTier, TIER_THRESHOLDS, UserProfile } from '../types';
 
 interface AuthState {
@@ -55,6 +56,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setSession(session);
       if (session?.user) {
         fetchProfile(session.user.id);
+        loginRevenueCat(session.user.id);
       }
       setIsLoading(false);
     });
@@ -67,9 +69,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       if (session?.user) {
         identifyUser(session.user.id);
         fetchProfile(session.user.id);
+        loginRevenueCat(session.user.id);
       } else {
         resetAnalytics();
         setProfile(null);
+        logoutRevenueCat();
       }
     });
 
