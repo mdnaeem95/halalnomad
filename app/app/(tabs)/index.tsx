@@ -107,7 +107,7 @@ export default function ExploreScreen() {
   }
 
   if (locationLoading) {
-    return <LoadingSplash />;
+    return <LoadingSplash message="Finding your location" />;
   }
 
   if (isLoading && places.length === 0) {

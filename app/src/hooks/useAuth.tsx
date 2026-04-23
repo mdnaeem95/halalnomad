@@ -47,6 +47,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         points: data.points,
         tier: getTierForPoints(data.points),
         created_at: data.created_at,
+        notifications_enabled: data.notifications_enabled ?? true,
       });
     }
   }

@@ -1,11 +1,14 @@
 import { useEffect, useRef, useState } from 'react';
-import { Platform } from 'react-native';
+import { AppState, AppStateStatus, Platform } from 'react-native';
 import * as Notifications from 'expo-notifications';
 import * as Device from 'expo-device';
 import Constants from 'expo-constants';
+import { router } from 'expo-router';
 import { supabase } from '../lib/supabase';
+import { saveUserTimezone, touchLastActive } from '../lib/notifications';
 
-// Configure how notifications appear when app is foregrounded
+const HEARTBEAT_MIN_INTERVAL_MS = 60 * 60 * 1000; // throttle to once per hour
+
 Notifications.setNotificationHandler({
   handleNotification: async () => ({
     shouldShowAlert: true,
@@ -16,13 +19,8 @@ Notifications.setNotificationHandler({
   }),
 });
 
-/**
- * Register for push notifications and return the Expo push token.
- */
 async function registerForPushNotifications(): Promise<string | null> {
-  if (!Device.isDevice) {
-    return null;
-  }
+  if (!Device.isDevice) return null;
 
   const { status: existingStatus } = await Notifications.getPermissionsAsync();
   let finalStatus = existingStatus;
@@ -31,14 +29,11 @@ async function registerForPushNotifications(): Promise<string | null> {
     const { status } = await Notifications.requestPermissionsAsync();
     finalStatus = status;
   }
-
-  if (finalStatus !== 'granted') {
-    return null;
-  }
+  if (finalStatus !== 'granted') return null;
 
   const projectId = Constants.expoConfig?.extra?.eas?.projectId;
   const tokenData = await Notifications.getExpoPushTokenAsync(
-    projectId ? { projectId } : {}
+    projectId ? { projectId } : {},
   );
 
   if (Platform.OS === 'android') {
@@ -52,51 +47,96 @@ async function registerForPushNotifications(): Promise<string | null> {
   return tokenData.data;
 }
 
-/**
- * Save the push token to the user's profile in Supabase.
- */
 async function savePushToken(userId: string, token: string) {
-  await supabase
-    .from('profiles')
-    .update({ push_token: token })
-    .eq('id', userId);
+  await supabase.from('profiles').update({ push_token: token }).eq('id', userId);
 }
 
-/**
- * Hook to manage push notifications.
- */
+function handleNotificationTap(data: Record<string, unknown> | undefined) {
+  if (!data) return;
+  const placeId = typeof data.placeId === 'string' ? data.placeId : null;
+  const screen = typeof data.screen === 'string' ? data.screen : null;
+  if (placeId) {
+    router.push(`/place/${placeId}`);
+  } else if (screen) {
+    router.push(screen as never);
+  }
+}
+
 export function useNotifications(userId: string | null) {
   const [expoPushToken, setExpoPushToken] = useState<string | null>(null);
-  const notificationListener = useRef<Notifications.EventSubscription | null>(null);
-  const responseListener = useRef<Notifications.EventSubscription | null>(null);
+  const receivedSub = useRef<Notifications.EventSubscription | null>(null);
+  const responseSub = useRef<Notifications.EventSubscription | null>(null);
+  const lastHeartbeat = useRef<number>(0);
 
+  // Register push token + persist timezone on login
   useEffect(() => {
     registerForPushNotifications().then((token) => {
       if (token) {
         setExpoPushToken(token);
-        if (userId) {
-          savePushToken(userId, token);
-        }
+        if (userId) savePushToken(userId, token);
       }
     });
 
-    notificationListener.current =
-      Notifications.addNotificationReceivedListener((_notification) => {
-        // Handle foreground notification
-      });
+    if (userId) {
+      try {
+        const tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
+        if (tz) saveUserTimezone(userId, tz);
+      } catch {
+        // timezone is optional — silently skip if unavailable
+      }
+    }
+  }, [userId]);
 
-    responseListener.current =
-      Notifications.addNotificationResponseReceivedListener((response) => {
-        const data = response.notification.request.content.data;
-        if (data?.placeId) {
-          // Navigate to place detail
-        }
-      });
+  // Notification listeners — handle foreground + tap-to-open
+  useEffect(() => {
+    receivedSub.current = Notifications.addNotificationReceivedListener(() => {
+      // foreground: the handler above already surfaces the banner
+    });
+
+    responseSub.current = Notifications.addNotificationResponseReceivedListener(
+      (response) => {
+        handleNotificationTap(
+          response.notification.request.content.data as
+            | Record<string, unknown>
+            | undefined,
+        );
+      },
+    );
+
+    // If the app was launched from a notification (cold start), route now.
+    Notifications.getLastNotificationResponseAsync().then((response) => {
+      if (response) {
+        handleNotificationTap(
+          response.notification.request.content.data as
+            | Record<string, unknown>
+            | undefined,
+        );
+      }
+    });
 
     return () => {
-      notificationListener.current?.remove();
-      responseListener.current?.remove();
+      receivedSub.current?.remove();
+      responseSub.current?.remove();
     };
+  }, []);
+
+  // last_active_at heartbeat — fire on foreground, throttled
+  useEffect(() => {
+    if (!userId) return;
+
+    const beat = () => {
+      const now = Date.now();
+      if (now - lastHeartbeat.current < HEARTBEAT_MIN_INTERVAL_MS) return;
+      lastHeartbeat.current = now;
+      touchLastActive(userId);
+    };
+
+    beat(); // immediate on mount/sign-in
+
+    const sub = AppState.addEventListener('change', (state: AppStateStatus) => {
+      if (state === 'active') beat();
+    });
+    return () => sub.remove();
   }, [userId]);
 
   return { expoPushToken };

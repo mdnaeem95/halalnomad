@@ -1,0 +1,10 @@
+# Supabase CLI project config
+# Docs: https://supabase.com/docs/guides/cli/config
+# Only fields actually used by this project are set. The `project_id` is
+# the Supabase project ref — found in the dashboard URL.
+
+project_id = "aytvorjaetitthzuijkv"
+
+[functions.send-push]
+# Use the platform JWT layer for auth — we verify the caller is the service role.
+verify_jwt = true

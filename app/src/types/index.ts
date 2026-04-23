@@ -144,6 +144,7 @@ export interface UserProfile {
   points: number;
   tier: ContributorTier;
   created_at: string;
+  notifications_enabled: boolean;
 }
 
 export interface SavedList {

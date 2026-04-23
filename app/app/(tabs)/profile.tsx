@@ -6,6 +6,7 @@ import { useTranslation } from 'react-i18next';
 import { useAuth } from '../../src/hooks/useAuth';
 import { usePremium } from '../../src/hooks/usePremium';
 import { useTheme } from '../../src/hooks/useTheme';
+import { setNotificationsEnabled } from '../../src/lib/notifications';
 import { useAppStore } from '../../src/stores/app-store';
 import { TierBadge } from '../../src/components/TierBadge';
 import { TIER_THRESHOLDS, ContributorTier } from '../../src/types';
@@ -25,7 +26,7 @@ function getNextTier(current: ContributorTier): ContributorTier | null {
 }
 
 export default function ProfileScreen() {
-  const { user, profile, signOut } = useAuth();
+  const { user, profile, signOut, refreshProfile } = useAuth();
   const { t } = useTranslation();
   const language = useAppStore((s) => s.language);
   const setLanguage = useAppStore((s) => s.setLanguage);
@@ -251,6 +252,42 @@ export default function ProfileScreen() {
         </View>
       </View>
 
+      {/* Notifications toggle */}
+      <Pressable
+        style={styles.settingsCard}
+        onPress={async () => {
+          if (!user) return;
+          const next = !profile.notifications_enabled;
+          await setNotificationsEnabled(user.id, next);
+          await refreshProfile();
+        }}
+        accessibilityRole="switch"
+        accessibilityState={{ checked: profile.notifications_enabled }}
+        accessibilityLabel="Toggle push notifications"
+      >
+        <View style={styles.notifRow}>
+          <View style={styles.notifText}>
+            <Text style={styles.notifTitle}>Push notifications</Text>
+            <Text style={styles.notifDesc}>
+              Get notified when your places are verified or disputed.
+            </Text>
+          </View>
+          <View
+            style={[
+              styles.toggle,
+              profile.notifications_enabled && styles.toggleOn,
+            ]}
+          >
+            <View
+              style={[
+                styles.toggleKnob,
+                profile.notifications_enabled && styles.toggleKnobOn,
+              ]}
+            />
+          </View>
+        </View>
+      </Pressable>
+
       <Pressable
         style={styles.signOutButton}
         onPress={signOut}
@@ -449,6 +486,7 @@ const createStyles = (c: AppColors) => StyleSheet.create({
     flexDirection: 'row',
     flexWrap: 'wrap',
     gap: spacing.sm,
+    marginTop: spacing.sm,
   },
   langChip: {
     backgroundColor: c.background,
@@ -501,6 +539,45 @@ const createStyles = (c: AppColors) => StyleSheet.create({
     borderRadius: borderRadius.md,
     padding: 3,
     marginTop: spacing.sm,
+  },
+  notifRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.md,
+  },
+  notifText: {
+    flex: 1,
+    gap: 2,
+  },
+  notifTitle: {
+    ...typography.label,
+    color: c.textPrimary,
+    fontSize: 15,
+  },
+  notifDesc: {
+    ...typography.caption,
+    color: c.textSecondary,
+    lineHeight: 18,
+  },
+  toggle: {
+    width: 48,
+    height: 28,
+    borderRadius: 14,
+    backgroundColor: c.divider,
+    padding: 2,
+    justifyContent: 'center',
+  },
+  toggleOn: {
+    backgroundColor: c.primary,
+  },
+  toggleKnob: {
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    backgroundColor: '#FFFFFF',
+  },
+  toggleKnobOn: {
+    alignSelf: 'flex-end',
   },
   themeOption: {
     flex: 1,

@@ -1,19 +1,23 @@
 import React, { useEffect, useRef } from 'react';
 import { Animated, StyleSheet, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { colors, spacing, typography } from '../constants/theme';
+import { spacing, typography } from '../constants/theme';
+
+const SPLASH_BG = '#1B5E20';
 
 /**
- * Animated splash screen shown while location is loading.
- * Pulsing compass icon with a fade-in tagline.
+ * Animated splash screen that matches the native splash background (#1B5E20)
+ * so there's no visible transition when Expo hands off from its splash to us.
+ *
+ * Used both at app boot (while auth is resolving) and on the Explore tab
+ * while location resolves.
  */
-export function LoadingSplash() {
+export function LoadingSplash({ message }: { message?: string } = {}) {
   const pulseAnim = useRef(new Animated.Value(1)).current;
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const dotAnim = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
-    // Pulse the icon
     Animated.loop(
       Animated.sequence([
         Animated.timing(pulseAnim, { toValue: 1.15, duration: 800, useNativeDriver: true }),
@@ -21,7 +25,6 @@ export function LoadingSplash() {
       ])
     ).start();
 
-    // Fade in the tagline
     Animated.timing(fadeAnim, {
       toValue: 1,
       duration: 1200,
@@ -29,11 +32,10 @@ export function LoadingSplash() {
       useNativeDriver: true,
     }).start();
 
-    // Animate the loading dots
     Animated.loop(
       Animated.sequence([
         Animated.timing(dotAnim, { toValue: 1, duration: 600, useNativeDriver: true }),
-        Animated.timing(dotAnim, { toValue: 0.3, duration: 600, useNativeDriver: true }),
+        Animated.timing(dotAnim, { toValue: 0.4, duration: 600, useNativeDriver: true }),
       ])
     ).start();
   }, []);
@@ -42,21 +44,19 @@ export function LoadingSplash() {
     <View style={styles.container}>
       <Animated.View style={[styles.iconContainer, { transform: [{ scale: pulseAnim }] }]}>
         <View style={styles.iconCircle}>
-          <Ionicons name="compass" size={48} color={colors.white} />
+          <Ionicons name="compass" size={48} color={SPLASH_BG} />
         </View>
       </Animated.View>
 
       <Text style={styles.title}>HalalNomad</Text>
 
       <Animated.View style={{ opacity: fadeAnim }}>
-        <Text style={styles.tagline}>
-          Halal food, anywhere in the world
-        </Text>
+        <Text style={styles.tagline}>Halal food, anywhere in the world</Text>
       </Animated.View>
 
       <Animated.View style={[styles.loadingRow, { opacity: dotAnim }]}>
-        <Ionicons name="location" size={14} color={colors.primaryLight} />
-        <Text style={styles.loadingText}>Finding your location</Text>
+        <Ionicons name="location" size={14} color="rgba(255,255,255,0.8)" />
+        <Text style={styles.loadingText}>{message ?? 'Getting ready'}</Text>
       </Animated.View>
     </View>
   );
@@ -67,7 +67,7 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: colors.background,
+    backgroundColor: SPLASH_BG,
     padding: spacing.xl,
   },
   iconContainer: {
@@ -77,24 +77,24 @@ const styles = StyleSheet.create({
     width: 88,
     height: 88,
     borderRadius: 44,
-    backgroundColor: colors.primary,
+    backgroundColor: '#FFFFFF',
     justifyContent: 'center',
     alignItems: 'center',
-    shadowColor: colors.primary,
+    shadowColor: '#000',
     shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
+    shadowOpacity: 0.25,
     shadowRadius: 12,
     elevation: 8,
   },
   title: {
     ...typography.h1,
-    color: colors.primary,
+    color: '#FFFFFF',
     fontSize: 32,
     marginBottom: spacing.sm,
   },
   tagline: {
     ...typography.body,
-    color: colors.textSecondary,
+    color: 'rgba(255,255,255,0.85)',
     textAlign: 'center',
     marginBottom: spacing.xxl,
   },
@@ -105,6 +105,6 @@ const styles = StyleSheet.create({
   },
   loadingText: {
     ...typography.bodySmall,
-    color: colors.primaryLight,
+    color: 'rgba(255,255,255,0.8)',
   },
 });
