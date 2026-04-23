@@ -1,0 +1,20 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="1024" height="1024">
+  <!-- Android adaptive icon foreground (no background - Android provides that) -->
+  <!-- Centered in safe zone (66% of canvas = ~676px centered) -->
+
+  <!-- Location pin with crescent -->
+  <g transform="translate(512, 370) scale(0.6)">
+    <!-- Pin body -->
+    <path d="M0-220 C-121-220-220-121-220 0 C-220 88-160 176-60 280 L-20 324 C-8 338 8 338 20 324 L60 280 C160 176 220 88 220 0 C220-121 121-220 0-220z" fill="white"/>
+
+    <!-- Crescent moon -->
+    <circle cx="0" cy="-10" r="75" fill="#1B5E20"/>
+    <circle cx="28" cy="-10" r="60" fill="white"/>
+
+    <!-- Star -->
+    <polygon points="75,-35 80,-20 95,-20 83,-10 88,5 75,-5 62,5 67,-10 55,-20 70,-20" fill="#1B5E20"/>
+  </g>
+
+  <!-- "HN" text -->
+  <text x="512" y="760" text-anchor="middle" font-family="system-ui, -apple-system, 'Helvetica Neue', sans-serif" font-size="140" font-weight="800" fill="white" letter-spacing="-4">HN</text>
+</svg>

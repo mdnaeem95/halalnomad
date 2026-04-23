@@ -1,0 +1,37 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1284 2778" width="1284" height="2778">
+  <!-- Full background -->
+  <rect width="1284" height="2778" fill="#1B5E20"/>
+
+  <!-- Subtle gradient -->
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#2E7D32"/>
+      <stop offset="100%" stop-color="#1B5E20"/>
+    </linearGradient>
+    <radialGradient id="spotlight" cx="50%" cy="35%" r="50%">
+      <stop offset="0%" stop-color="#388E3C" stop-opacity="0.3"/>
+      <stop offset="100%" stop-color="#1B5E20" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+  <rect width="1284" height="2778" fill="url(#bg)"/>
+  <rect width="1284" height="2778" fill="url(#spotlight)"/>
+
+  <!-- Location pin icon -->
+  <g transform="translate(642, 1050) scale(1.0)">
+    <!-- Pin body -->
+    <path d="M0-220 C-121-220-220-121-220 0 C-220 88-160 176-60 280 L-20 324 C-8 338 8 338 20 324 L60 280 C160 176 220 88 220 0 C220-121 121-220 0-220z" fill="white" opacity="0.95"/>
+
+    <!-- Crescent moon inside pin -->
+    <circle cx="0" cy="-10" r="75" fill="#1B5E20"/>
+    <circle cx="28" cy="-10" r="60" fill="white" opacity="0.95"/>
+
+    <!-- Star next to crescent -->
+    <polygon points="75,-35 80,-20 95,-20 83,-10 88,5 75,-5 62,5 67,-10 55,-20 70,-20" fill="#1B5E20"/>
+  </g>
+
+  <!-- App name -->
+  <text x="642" y="1560" text-anchor="middle" font-family="system-ui, -apple-system, 'Helvetica Neue', sans-serif" font-size="120" font-weight="800" fill="white" letter-spacing="-2">HalalNomad</text>
+
+  <!-- Tagline -->
+  <text x="642" y="1640" text-anchor="middle" font-family="system-ui, -apple-system, 'Helvetica Neue', sans-serif" font-size="44" font-weight="400" fill="white" opacity="0.7">Halal food, anywhere in the world</text>
+</svg>

@@ -1,0 +1,58 @@
+{
+  "expo": {
+    "name": "HalalNomad",
+    "slug": "halalnomad",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "automatic",
+    "newArchEnabled": true,
+    "scheme": "halalnomad",
+    "splash": {
+      "image": "./assets/splash-icon.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#1B5E20"
+    },
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.halalnomad.app",
+      "config": {
+        "googleMapsApiKey": "AIzaSyDytPqAN0RbRt3_jytvLLdIiODyN8dJXCM"
+      },
+      "infoPlist": {
+        "NSLocationWhenInUseUsageDescription": "HalalNomad needs your location to show Halal places near you.",
+        "NSCameraUsageDescription": "HalalNomad needs camera access to take photos of Halal places and certificates.",
+        "NSPhotoLibraryUsageDescription": "HalalNomad needs photo library access to upload photos of Halal places."
+      }
+    },
+    "android": {
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/adaptive-icon.png",
+        "backgroundColor": "#1B5E20"
+      },
+      "edgeToEdgeEnabled": true,
+      "package": "com.halalnomad.app",
+      "config": {
+        "googleMaps": {
+          "apiKey": "AIzaSyDytPqAN0RbRt3_jytvLLdIiODyN8dJXCM"
+        }
+      },
+      "permissions": [
+        "ACCESS_FINE_LOCATION",
+        "ACCESS_COARSE_LOCATION",
+        "CAMERA"
+      ]
+    },
+    "web": {
+      "favicon": "./assets/favicon.png"
+    },
+    "plugins": [
+      "expo-router",
+      "expo-location",
+      "expo-image-picker",
+      "@sentry/react-native",
+      "expo-secure-store",
+      "expo-localization"
+    ]
+  }
+}

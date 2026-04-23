@@ -1,0 +1,570 @@
+import React, { useState } from 'react';
+import {
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  View,
+} from 'react-native';
+import { Image } from 'expo-image';
+import * as Haptics from 'expo-haptics';
+import { useLocalSearchParams, router } from 'expo-router';
+import * as Clipboard from 'expo-clipboard';
+import { Ionicons } from '@expo/vector-icons';
+import { useAuth } from '../../src/hooks/useAuth';
+import { useLocation } from '../../src/hooks/useLocation';
+import { useTheme } from '../../src/hooks/useTheme';
+import { useCooldown } from '../../src/hooks/useCooldown';
+import { usePlace, useReviews, useVerifyPlace } from '../../src/hooks/usePlaces';
+import { getMapProvider } from '../../src/services/map';
+import { CUISINE_LABELS, PRICE_LABELS } from '../../src/types';
+import { HalalBadge } from '../../src/components/HalalBadge';
+import { FeaturedBadge } from '../../src/components/FeaturedBadge';
+import { usePremiumGuard } from '../../src/components/PremiumGate';
+import { ReportWarning } from '../../src/components/ReportWarning';
+import { PlaceDetailSkeleton } from '../../src/components/Skeleton';
+import { AppDialog, Toast } from '../../src/components/AppDialog';
+import {
+  borderRadius,
+  colors,
+  shadows,
+  spacing,
+  typography,
+} from '../../src/constants/theme';
+
+export default function PlaceDetailScreen() {
+  const { id } = useLocalSearchParams<{ id: string }>();
+  const { user } = useAuth();
+  const { location } = useLocation();
+
+  const { data: place, isLoading: placeLoading } = usePlace(id);
+  const { data: reviews = [] } = useReviews(id ?? '');
+  const { colors: c } = useTheme();
+  const { requirePremium } = usePremiumGuard();
+  const verifyMutation = useVerifyPlace();
+  const { isOnCooldown: verifyOnCooldown, trigger: triggerVerify } = useCooldown(5000);
+  const { isOnCooldown: reportOnCooldown, trigger: triggerReport } = useCooldown(5000);
+
+  // Dialog state
+  const [dialog, setDialog] = useState<{
+    visible: boolean;
+    variant: 'success' | 'error' | 'confirm' | 'info';
+    title: string;
+    message: string;
+    actions?: { label: string; onPress: () => void; style?: 'primary' | 'destructive' | 'cancel' }[];
+  }>({ visible: false, variant: 'info', title: '', message: '' });
+
+  // Toast state
+  const [toast, setToast] = useState<{
+    visible: boolean;
+    message: string;
+    variant: 'success' | 'error' | 'info';
+  }>({ visible: false, message: '', variant: 'success' });
+
+  function showToast(message: string, variant: 'success' | 'error' | 'info' = 'success') {
+    setToast({ visible: true, message, variant });
+  }
+
+  function closeDialog() {
+    setDialog((d) => ({ ...d, visible: false }));
+  }
+
+  function handleVerify() {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    if (!user || !place) {
+      setDialog({
+        visible: true,
+        variant: 'info',
+        title: 'Sign in required',
+        message: 'Please sign in to verify places.',
+        actions: [
+          { label: 'Sign In', onPress: () => { closeDialog(); router.push('/auth'); }, style: 'primary' },
+          { label: 'Cancel', onPress: closeDialog, style: 'cancel' },
+        ],
+      });
+      return;
+    }
+
+    triggerVerify(() => {
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      showToast('Halal status confirmed! +15 points');
+      verifyMutation.mutate(
+        { placeId: place.id, userId: user.id, type: 'confirm' },
+        {
+          onError: () => showToast('Already verified or failed', 'error'),
+        }
+      );
+    });
+  }
+
+  function handleFlag(type: 'flag_closed' | 'flag_not_halal') {
+    if (!user || !place) return;
+    const label = type === 'flag_closed' ? 'closed' : 'not Halal';
+
+    setDialog({
+      visible: true,
+      variant: 'confirm',
+      title: `Report as ${label}?`,
+      message: 'This will be reviewed by the community. Thank you for helping keep information accurate.',
+      actions: [
+        {
+          label: 'Report',
+          style: 'destructive',
+          onPress: () => {
+            closeDialog();
+            triggerReport(() => {
+              showToast('Report submitted. +10 points');
+              verifyMutation.mutate(
+                { placeId: place.id, userId: user.id, type },
+                {
+                  onError: () => showToast('Failed to report', 'error'),
+                }
+              );
+            });
+          },
+        },
+        { label: 'Cancel', onPress: closeDialog, style: 'cancel' },
+      ],
+    });
+  }
+
+  function handleDirections() {
+    if (!place || !location) return;
+    const provider = getMapProvider('google');
+    provider.openDirections(location, {
+      latitude: place.latitude,
+      longitude: place.longitude,
+    });
+  }
+
+  async function handleCopyAddress() {
+    if (!place) return;
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    const address = place.address_local
+      ? `${place.address_en}\n${place.address_local}`
+      : place.address_en;
+    await Clipboard.setStringAsync(address);
+    showToast('Address copied to clipboard', 'info');
+  }
+
+  if (placeLoading) {
+    return <PlaceDetailSkeleton />;
+  }
+
+  if (!place) {
+    return (
+      <View style={styles.centered}>
+        <Text style={styles.errorText}>Place not found.</Text>
+      </View>
+    );
+  }
+
+  return (
+    <View style={{ flex: 1 }}>
+      <ScrollView style={[styles.container, { backgroundColor: c.background }]} contentContainerStyle={styles.content}>
+        {/* Photos */}
+        {place.photos.length > 0 && (
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.photos}>
+            {place.photos.map((url, i) => (
+              <Image
+              key={i}
+              source={{ uri: url }}
+              style={styles.photo}
+              contentFit="cover"
+              transition={300}
+            />
+            ))}
+          </ScrollView>
+        )}
+
+        {/* Header */}
+        <View style={styles.header}>
+          <Text style={[styles.name, { color: c.textPrimary }]}>{place.name_en}</Text>
+          {place.name_local && (
+            <Text style={[styles.localName, { color: c.textSecondary }]}>{place.name_local}</Text>
+          )}
+          {place.is_featured && place.featured_tier && (
+            <FeaturedBadge tier={place.featured_tier} />
+          )}
+          <HalalBadge level={place.halal_level} />
+          {place.verification_count > 0 && (
+            <Text style={[styles.verificationCount, { color: c.textTertiary }]}>
+              {place.verification_count} {place.verification_count === 1 ? 'verification' : 'verifications'}
+            </Text>
+          )}
+        </View>
+
+        {/* Report warnings */}
+        <ReportWarning
+          closedReports={place.closed_reports}
+          notHalalReports={place.not_halal_reports}
+        />
+
+        {/* Details */}
+        <View style={[styles.detailsCard, { backgroundColor: c.surface }]}>
+          <Pressable
+            onPress={handleCopyAddress}
+            style={styles.addressRow}
+            accessibilityRole="button"
+            accessibilityLabel={`Address: ${place.address_en}${place.address_local ? `, ${place.address_local}` : ''}. Tap to copy.`}
+          >
+            <View style={styles.addressContent}>
+              <Text style={[styles.detailLabel, { color: c.textTertiary }]}>Address</Text>
+              <Text style={[styles.detailValue, { color: c.textPrimary }]}>{place.address_en}</Text>
+              {place.address_local && (
+                <Text style={[styles.localAddress, { color: c.textSecondary }]}>{place.address_local}</Text>
+              )}
+            </View>
+            <Ionicons name="copy-outline" size={18} color={c.primary} />
+          </Pressable>
+
+          <View style={[styles.divider, { backgroundColor: c.divider }]} />
+
+          <View style={styles.detailRow}>
+            <Text style={[styles.detailLabel, { color: c.textTertiary }]}>Cuisine</Text>
+            <Text style={[styles.detailValue, { color: c.textPrimary }]}>{CUISINE_LABELS[place.cuisine_type]}</Text>
+          </View>
+
+          {place.price_range && (
+            <>
+              <View style={[styles.divider, { backgroundColor: c.divider }]} />
+              <View style={styles.detailRow}>
+                <Text style={[styles.detailLabel, { color: c.textTertiary }]}>Price Range</Text>
+                <Text style={[styles.detailValue, { color: c.textPrimary }]}>{PRICE_LABELS[place.price_range]}</Text>
+              </View>
+            </>
+          )}
+
+          {place.hours && (
+            <>
+              <View style={[styles.divider, { backgroundColor: c.divider }]} />
+              <View style={styles.detailRow}>
+                <Text style={[styles.detailLabel, { color: c.textTertiary }]}>Hours</Text>
+                <Text style={[styles.detailValue, { color: c.textPrimary }]}>{place.hours}</Text>
+              </View>
+            </>
+          )}
+
+          {place.description && (
+            <>
+              <View style={[styles.divider, { backgroundColor: c.divider }]} />
+              <View style={styles.detailRow}>
+                <Text style={[styles.detailLabel, { color: c.textTertiary }]}>About</Text>
+                <Text style={[styles.detailValue, { color: c.textPrimary }]}>{place.description}</Text>
+              </View>
+            </>
+          )}
+        </View>
+
+        {/* Action buttons */}
+        <View style={styles.actions}>
+          <Pressable
+            style={styles.primaryButton}
+            onPress={handleDirections}
+            accessibilityRole="button"
+            accessibilityLabel="Get directions to this place"
+          >
+            <Ionicons name="navigate-outline" size={18} color={c.textOnPrimary} />
+            <Text style={styles.primaryButtonText}>Get Directions</Text>
+          </Pressable>
+
+          <Pressable
+            style={[styles.saveButton, { backgroundColor: c.surface, borderColor: c.accent }]}
+            onPress={() => {
+              if (requirePremium()) {
+                Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+                showToast('Saved to list! (coming soon)', 'info');
+              }
+            }}
+            accessibilityRole="button"
+            accessibilityLabel="Save to trip list. Premium feature."
+          >
+            <Ionicons name="bookmark-outline" size={18} color={c.accent} />
+            <Text style={[styles.saveButtonText, { color: c.accent }]}>Save to List</Text>
+            <View style={[styles.premiumBadge, { backgroundColor: c.accent }]}>
+              <Text style={styles.premiumBadgeText}>PRO</Text>
+            </View>
+          </Pressable>
+
+          <Pressable
+            style={[styles.verifyButton, { backgroundColor: c.surface, borderColor: c.primaryLight }, (verifyMutation.isPending || verifyOnCooldown) && styles.buttonDisabled]}
+            onPress={handleVerify}
+            disabled={verifyMutation.isPending || verifyOnCooldown}
+            accessibilityRole="button"
+            accessibilityLabel="Confirm this place is Halal"
+            accessibilityHint="Awards you 15 points"
+            accessibilityState={{ disabled: verifyMutation.isPending || verifyOnCooldown }}
+          >
+            <Ionicons name="checkmark-circle-outline" size={18} color={c.primaryLight} />
+            <Text style={styles.verifyButtonText}>Confirm Halal</Text>
+          </Pressable>
+
+          <View style={styles.flagRow}>
+            <Pressable
+              style={[styles.flagButton, { backgroundColor: c.surface, borderColor: c.border }, reportOnCooldown && styles.buttonDisabled]}
+              onPress={() => handleFlag('flag_closed')}
+              disabled={reportOnCooldown}
+              accessibilityRole="button"
+              accessibilityLabel="Report this place as closed"
+              accessibilityState={{ disabled: reportOnCooldown }}
+            >
+              <Text style={[styles.flagButtonText, { color: c.textSecondary }]}>Report Closed</Text>
+            </Pressable>
+            <Pressable
+              style={[styles.flagButton, { backgroundColor: c.surface, borderColor: c.border }, reportOnCooldown && styles.buttonDisabled]}
+              onPress={() => handleFlag('flag_not_halal')}
+              disabled={reportOnCooldown}
+              accessibilityRole="button"
+              accessibilityLabel="Report this place as not Halal"
+              accessibilityState={{ disabled: reportOnCooldown }}
+            >
+              <Text style={[styles.flagButtonText, { color: c.textSecondary }]}>Report Not Halal</Text>
+            </Pressable>
+          </View>
+        </View>
+
+        {/* Reviews */}
+        <View style={styles.reviewsSection}>
+          <Text style={[styles.sectionTitle, { color: c.textPrimary }]}>
+            Reviews ({reviews.length})
+          </Text>
+          {reviews.length === 0 ? (
+            <Text style={[styles.noReviews, { color: c.textTertiary }]}>No reviews yet. Be the first!</Text>
+          ) : (
+            reviews.map((review) => (
+              <View key={review.id} style={[styles.reviewCard, { backgroundColor: c.surface }]}>
+                <View style={styles.reviewHeader}>
+                  <Text style={[styles.reviewerName, { color: c.textPrimary }]}>{review.user_display_name}</Text>
+                  <Text style={styles.reviewRating}>
+                    {'★'.repeat(review.rating)}{'☆'.repeat(5 - review.rating)}
+                  </Text>
+                </View>
+                <Text style={[styles.reviewText, { color: c.textSecondary }]}>{review.text}</Text>
+              </View>
+            ))
+          )}
+        </View>
+      </ScrollView>
+
+      <Toast
+        visible={toast.visible}
+        message={toast.message}
+        variant={toast.variant}
+        onDismiss={() => setToast((t) => ({ ...t, visible: false }))}
+      />
+
+      <AppDialog
+        visible={dialog.visible}
+        onClose={closeDialog}
+        variant={dialog.variant}
+        title={dialog.title}
+        message={dialog.message}
+        actions={dialog.actions}
+      />
+    </View>
+  );
+}
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    backgroundColor: colors.background,
+  },
+  content: {
+    paddingBottom: spacing.xxl,
+  },
+  centered: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  errorText: {
+    ...typography.body,
+    color: colors.textSecondary,
+  },
+  photos: {
+    height: 220,
+  },
+  photo: {
+    width: 320,
+    height: 220,
+    marginEnd: 2,
+    backgroundColor: colors.border,
+  },
+  header: {
+    padding: spacing.md,
+    gap: spacing.xs,
+  },
+  name: {
+    ...typography.h1,
+    color: colors.textPrimary,
+  },
+  localName: {
+    ...typography.h3,
+    color: colors.textSecondary,
+    fontWeight: '400',
+  },
+  verificationCount: {
+    ...typography.caption,
+    color: colors.textTertiary,
+    marginTop: spacing.xs,
+  },
+  detailsCard: {
+    backgroundColor: colors.white,
+    marginHorizontal: spacing.md,
+    borderRadius: borderRadius.lg,
+    ...shadows.sm,
+    overflow: 'hidden',
+  },
+  addressRow: {
+    padding: spacing.md,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  addressContent: {
+    flex: 1,
+    gap: 2,
+  },
+  localAddress: {
+    ...typography.bodySmall,
+    color: colors.textSecondary,
+    marginTop: 2,
+  },
+  detailRow: {
+    padding: spacing.md,
+    gap: 2,
+  },
+  detailLabel: {
+    ...typography.caption,
+    color: colors.textTertiary,
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+  },
+  detailValue: {
+    ...typography.body,
+    color: colors.textPrimary,
+  },
+  divider: {
+    height: 1,
+    backgroundColor: colors.divider,
+    marginHorizontal: spacing.md,
+  },
+  actions: {
+    padding: spacing.md,
+    gap: spacing.sm,
+  },
+  primaryButton: {
+    backgroundColor: colors.primary,
+    borderRadius: borderRadius.md,
+    padding: 14,
+    alignItems: 'center',
+    flexDirection: 'row',
+    justifyContent: 'center',
+    gap: spacing.sm,
+  },
+  primaryButtonText: {
+    ...typography.label,
+    color: colors.white,
+    fontSize: 16,
+  },
+  saveButton: {
+    borderRadius: borderRadius.md,
+    padding: 14,
+    alignItems: 'center',
+    borderWidth: 2,
+    flexDirection: 'row',
+    justifyContent: 'center',
+    gap: spacing.sm,
+  },
+  saveButtonText: {
+    ...typography.label,
+    fontSize: 16,
+  },
+  premiumBadge: {
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 4,
+  },
+  premiumBadgeText: {
+    fontSize: 9,
+    fontWeight: '800',
+    color: colors.white,
+    letterSpacing: 0.5,
+  },
+  verifyButton: {
+    backgroundColor: colors.white,
+    borderRadius: borderRadius.md,
+    padding: 14,
+    alignItems: 'center',
+    borderWidth: 2,
+    borderColor: colors.primaryLight,
+    flexDirection: 'row',
+    justifyContent: 'center',
+    gap: spacing.sm,
+  },
+  verifyButtonText: {
+    ...typography.label,
+    color: colors.primaryLight,
+    fontSize: 16,
+  },
+  buttonDisabled: {
+    opacity: 0.6,
+  },
+  flagRow: {
+    flexDirection: 'row',
+    gap: spacing.sm,
+  },
+  flagButton: {
+    flex: 1,
+    backgroundColor: colors.white,
+    borderRadius: borderRadius.md,
+    padding: 12,
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  flagButtonText: {
+    ...typography.caption,
+    color: colors.textSecondary,
+    fontWeight: '600',
+  },
+  reviewsSection: {
+    padding: spacing.md,
+  },
+  sectionTitle: {
+    ...typography.h3,
+    color: colors.textPrimary,
+    marginBottom: spacing.sm,
+  },
+  noReviews: {
+    ...typography.bodySmall,
+    color: colors.textTertiary,
+    fontStyle: 'italic',
+  },
+  reviewCard: {
+    backgroundColor: colors.white,
+    borderRadius: borderRadius.md,
+    padding: spacing.md,
+    marginBottom: spacing.sm,
+    ...shadows.sm,
+  },
+  reviewHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginBottom: spacing.xs,
+  },
+  reviewerName: {
+    ...typography.label,
+    color: colors.textPrimary,
+  },
+  reviewRating: {
+    fontSize: 14,
+    color: colors.accent,
+  },
+  reviewText: {
+    ...typography.bodySmall,
+    color: colors.textSecondary,
+    lineHeight: 20,
+  },
+});
