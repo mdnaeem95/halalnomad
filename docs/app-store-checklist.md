@@ -7,12 +7,12 @@
   - [Done] `splash.svg` → `assets/splash-icon.png` (1284x2778)
   - [Done] `adaptive-icon.svg` → `assets/adaptive-icon.png` (1024x1024)
 - [Not needed] Generate favicon from icon: `assets/favicon.png` (48x48)
-- [ ] Prepare App Store screenshots (required sizes):
-  - [ ] iPhone 6.9" (1320x2868) — iPhone 15 Pro Max
-  - [ ] iPhone 6.7" (1290x2796) — iPhone 14 Pro Max
-  - [ ] iPad 13" (2064x2752) — if supporting tablet
-  - [ ] Minimum 3 screenshots, recommended 5-6 per device size
-  - [ ] Screens to capture: Explore map, List view with places, Place detail, Search with filters, Profile with points
+- [Done] Prepare App Store screenshots (required sizes):
+  - [Done] iPhone 6.9" (1320x2868) — iPhone 15 Pro Max
+  - [Done] iPhone 6.7" (1290x2796) — iPhone 14 Pro Max
+  - [Done] iPad 13" (2064x2752) — if supporting tablet
+  - [Done] Minimum 3 screenshots, recommended 5-6 per device size
+  - [Done] Screens to capture: Explore map, List view with places, Place detail, Search with filters, Profile with points
 - [ ] Prepare Play Store screenshots:
   - [ ] Phone (1080x1920 minimum)
   - [ ] Feature graphic (1024x500)
@@ -35,7 +35,7 @@ Run these in Supabase SQL Editor (in order):
 - [Done] Sentry DSN (already configured)
 - [Done] PostHog API key (already configured)
 - [Done] RevenueCat API keys (already configured)
-  - [ ] Create products in App Store Connect: monthly ($4.99), yearly ($29.99)
+  - [Done] Create products in App Store Connect: monthly ($4.99), yearly ($29.99)
   - [ ] Create products in Google Play Console: matching prices
   - [ ] Link products to RevenueCat offerings
   - [ ] Verify entitlement name matches: `HalalNomad Premium`
@@ -49,13 +49,13 @@ Run these in Supabase SQL Editor (in order):
   - [Done] App name: `HalalNomad`
   - [Done] Subtitle: `Halal food, anywhere in the world`
   - [Done] Category: Primary — Food & Drink, Secondary — Travel
-  - [ ] Description (see below)
+  - [Done] Description (see below)
   - [Done] Keywords: halal, muslim, travel, food, restaurant, finder, verified, nomad, halal food
-  - [ ] Support URL
-  - [ ] Privacy policy URL
-  - [ ] Marketing URL (optional)
+  - [Done] Support URL
+  - [Done] Privacy policy URL
+  - [Done] Marketing URL (optional)
 - [Done] Age rating: 4+ (no objectionable content)
-- [ ] Upload screenshots
+- [Done] Upload screenshots
 - [Done] Configure in-app purchases (monthly + yearly)
 - [Done] Enable push notifications in Certificates, Identifiers & Profiles
 
@@ -81,21 +81,21 @@ Run these in Supabase SQL Editor (in order):
 
 ## 6. Legal
 
-- [ ] Privacy policy — must cover:
-  - [ ] What data is collected (email, location, photos, usage analytics)
-  - [ ] How data is stored (Supabase, Sentry, PostHog — all with data processing agreements)
-  - [ ] Data retention policy
-  - [ ] User rights (delete account, export data)
-  - [ ] Third-party services (Google Maps, RevenueCat, Sentry, PostHog)
-  - [ ] Cookie/tracking disclosure
-  - [ ] GDPR compliance (for EU users)
-  - [ ] Contact information
-- [ ] Terms of service — must cover:
-  - [ ] User-generated content policy
-  - [ ] Community guidelines (accurate reporting, no abuse)
-  - [ ] Subscription terms (auto-renewal, cancellation)
-  - [ ] Limitation of liability
-- [ ] Host both at a public URL (can use a simple GitHub Pages site)
+- [Done] Privacy policy — must cover:
+  - [Done] What data is collected (email, location, photos, usage analytics)
+  - [Done] How data is stored (Supabase, Sentry, PostHog — all with data processing agreements)
+  - [Done] Data retention policy
+  - [Done] User rights (delete account, export data)
+  - [Done] Third-party services (Google Maps, RevenueCat, Sentry, PostHog)
+  - [Done] Cookie/tracking disclosure
+  - [Done] GDPR compliance (for EU users)
+  - [Done] Contact information
+- [Done] Terms of service — must cover:
+  - [Done] User-generated content policy
+  - [Done] Community guidelines (accurate reporting, no abuse)
+  - [Done] Subscription terms (auto-renewal, cancellation)
+  - [Done] Limitation of liability
+- [Done] Host both at a public URL (can use a simple GitHub Pages site)
 
 ## 7. Build & Submit
 
