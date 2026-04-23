@@ -126,7 +126,7 @@ export default {
     earnAddPlace: 'Tambah tempat baharu',
     earnCertificate: 'Muat naik sijil halal',
     earnReview: 'Tulis ulasan',
-    earnVerify: 'Sahkan tempat',
+    earnVerify: 'Sahkan status Halal',
     earnPhoto: 'Muat naik gambar',
     earnReport: 'Lapor tempat',
     signOut: 'Log Keluar',

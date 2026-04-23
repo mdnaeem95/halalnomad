@@ -16,7 +16,6 @@ import { useTheme } from '../src/hooks/useTheme';
 import { AppDialog, Toast } from '../src/components/AppDialog';
 import {
   borderRadius,
-  colors,
   shadows,
   spacing,
   typography,
@@ -301,7 +300,7 @@ const styles = StyleSheet.create({
   },
   bestValue: {
     ...typography.caption,
-    color: colors.white,
+    color: '#FFFFFF',
     fontWeight: '700',
     paddingHorizontal: 10,
     paddingVertical: 2,

@@ -8,7 +8,8 @@ import {
   View,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { borderRadius, colors, shadows, spacing, typography } from '../constants/theme';
+import { AppColors, borderRadius, shadows, spacing, typography } from '../constants/theme';
+import { useTheme } from '../hooks/useTheme';
 
 type DialogVariant = 'success' | 'error' | 'confirm' | 'info';
 
@@ -27,12 +28,14 @@ interface AppDialogProps {
   actions?: DialogAction[];
 }
 
-const VARIANT_CONFIG: Record<DialogVariant, { icon: keyof typeof Ionicons.glyphMap; color: string }> = {
-  success: { icon: 'checkmark-circle', color: colors.success },
-  error: { icon: 'alert-circle', color: colors.error },
-  confirm: { icon: 'help-circle', color: colors.warning },
-  info: { icon: 'information-circle', color: colors.info },
-};
+function getVariantConfig(c: AppColors): Record<DialogVariant, { icon: keyof typeof Ionicons.glyphMap; color: string }> {
+  return {
+    success: { icon: 'checkmark-circle', color: c.success },
+    error: { icon: 'alert-circle', color: c.error },
+    confirm: { icon: 'help-circle', color: c.warning },
+    info: { icon: 'information-circle', color: c.info },
+  };
+}
 
 export function AppDialog({
   visible,
@@ -42,6 +45,8 @@ export function AppDialog({
   message,
   actions,
 }: AppDialogProps) {
+  const { colors: c } = useTheme();
+  const styles = React.useMemo(() => createStyles(c), [c]);
   const scaleAnim = useRef(new Animated.Value(0.9)).current;
   const opacityAnim = useRef(new Animated.Value(0)).current;
 
@@ -66,7 +71,7 @@ export function AppDialog({
     }
   }, [visible]);
 
-  const config = VARIANT_CONFIG[variant];
+  const config = getVariantConfig(c)[variant];
 
   const resolvedActions: DialogAction[] = actions ?? [
     { label: 'OK', onPress: onClose, style: 'primary' },
@@ -156,6 +161,8 @@ export function Toast({
   onDismiss,
   duration = 2500,
 }: ToastProps) {
+  const { colors: c } = useTheme();
+  const styles = React.useMemo(() => createStyles(c), [c]);
   const translateY = useRef(new Animated.Value(-100)).current;
 
   useEffect(() => {
@@ -180,9 +187,9 @@ export function Toast({
   if (!visible) return null;
 
   const toastColors = {
-    success: { bg: colors.success, icon: 'checkmark-circle' as const },
-    error: { bg: colors.error, icon: 'alert-circle' as const },
-    info: { bg: colors.info, icon: 'information-circle' as const },
+    success: { bg: c.success, icon: 'checkmark-circle' as const },
+    error: { bg: c.error, icon: 'alert-circle' as const },
+    info: { bg: c.info, icon: 'information-circle' as const },
   };
 
   const config = toastColors[variant];
@@ -197,13 +204,13 @@ export function Toast({
       accessibilityLiveRegion="polite"
       accessibilityLabel={message}
     >
-      <Ionicons name={config.icon} size={20} color={colors.white} />
+      <Ionicons name={config.icon} size={20} color={c.textOnPrimary} />
       <Text style={styles.toastText}>{message}</Text>
     </Animated.View>
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (c: AppColors) => StyleSheet.create({
   overlay: {
     flex: 1,
     backgroundColor: 'rgba(0, 0, 0, 0.4)',
@@ -212,7 +219,7 @@ const styles = StyleSheet.create({
     padding: spacing.xl,
   },
   dialog: {
-    backgroundColor: colors.white,
+    backgroundColor: c.surface,
     borderRadius: borderRadius.xl,
     padding: spacing.lg,
     width: '100%',
@@ -230,13 +237,13 @@ const styles = StyleSheet.create({
   },
   title: {
     ...typography.h3,
-    color: colors.textPrimary,
+    color: c.textPrimary,
     textAlign: 'center',
     marginBottom: spacing.xs,
   },
   message: {
     ...typography.bodySmall,
-    color: colors.textSecondary,
+    color: c.textSecondary,
     textAlign: 'center',
     lineHeight: 20,
     marginBottom: spacing.md,
@@ -252,10 +259,10 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   actionPrimary: {
-    backgroundColor: colors.primary,
+    backgroundColor: c.primary,
   },
   actionDestructive: {
-    backgroundColor: colors.error,
+    backgroundColor: c.error,
   },
   actionCancel: {
     backgroundColor: 'transparent',
@@ -265,13 +272,13 @@ const styles = StyleSheet.create({
     fontSize: 15,
   },
   actionTextPrimary: {
-    color: colors.white,
+    color: c.textOnPrimary,
   },
   actionTextDestructive: {
-    color: colors.white,
+    color: c.textOnPrimary,
   },
   actionTextCancel: {
-    color: colors.textSecondary,
+    color: c.textSecondary,
   },
   toast: {
     position: 'absolute',
@@ -288,7 +295,7 @@ const styles = StyleSheet.create({
   },
   toastText: {
     ...typography.label,
-    color: colors.white,
+    color: c.textOnPrimary,
     flex: 1,
   },
 });

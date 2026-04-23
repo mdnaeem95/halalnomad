@@ -6,8 +6,8 @@ import * as Haptics from 'expo-haptics';
 import { Place, CUISINE_LABELS, PRICE_LABELS } from '../types';
 import { useTheme } from '../hooks/useTheme';
 import {
+  AppColors,
   borderRadius,
-  colors,
   shadows,
   spacing,
   typography,
@@ -24,6 +24,7 @@ interface Props {
 
 export function PlaceCard({ place, onPress, distance }: Props) {
   const { colors: c } = useTheme();
+  const styles = React.useMemo(() => createStyles(c), [c]);
 
   function handlePress() {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
@@ -95,9 +96,9 @@ export function PlaceCard({ place, onPress, distance }: Props) {
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (c: AppColors) => StyleSheet.create({
   card: {
-    backgroundColor: colors.surface,
+    backgroundColor: c.surface,
     borderRadius: borderRadius.lg,
     overflow: 'hidden',
     ...shadows.md,
@@ -111,7 +112,7 @@ const styles = StyleSheet.create({
   image: {
     width: '100%',
     height: 140,
-    backgroundColor: colors.border,
+    backgroundColor: c.border,
   },
   content: {
     padding: spacing.md,
@@ -125,16 +126,16 @@ const styles = StyleSheet.create({
   },
   name: {
     ...typography.h3,
-    color: colors.textPrimary,
+    color: c.textPrimary,
     flex: 1,
   },
   localName: {
     ...typography.bodySmall,
-    color: colors.textSecondary,
+    color: c.textSecondary,
   },
   address: {
     ...typography.bodySmall,
-    color: colors.textTertiary,
+    color: c.textTertiary,
     marginTop: 2,
   },
   meta: {
@@ -145,12 +146,12 @@ const styles = StyleSheet.create({
   },
   cuisine: {
     ...typography.caption,
-    color: colors.primaryLight,
+    color: c.primaryLight,
     fontWeight: '600',
   },
   price: {
     ...typography.caption,
-    color: colors.textSecondary,
+    color: c.textSecondary,
   },
   distanceRow: {
     flexDirection: 'row',
@@ -159,6 +160,6 @@ const styles = StyleSheet.create({
   },
   distance: {
     ...typography.caption,
-    color: colors.textTertiary,
+    color: c.textTertiary,
   },
 });

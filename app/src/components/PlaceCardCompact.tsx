@@ -7,8 +7,8 @@ import { Place, CUISINE_LABELS, PRICE_LABELS } from '../types';
 import { useTheme } from '../hooks/useTheme';
 import { HalalBadge } from './HalalBadge';
 import {
+  AppColors,
   borderRadius,
-  colors,
   shadows,
   spacing,
   typography,
@@ -26,6 +26,7 @@ interface Props {
  */
 export function PlaceCardCompact({ place, onPress, width }: Props) {
   const { colors: c } = useTheme();
+  const styles = React.useMemo(() => createStyles(c), [c]);
 
   function handlePress() {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
@@ -91,7 +92,7 @@ export function PlaceCardCompact({ place, onPress, width }: Props) {
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (c: AppColors) => StyleSheet.create({
   card: {
     borderRadius: borderRadius.lg,
     overflow: 'hidden',
@@ -102,7 +103,7 @@ const styles = StyleSheet.create({
   image: {
     width: 100,
     height: '100%',
-    backgroundColor: colors.border,
+    backgroundColor: c.border,
   },
   imagePlaceholder: {
     alignItems: 'center',

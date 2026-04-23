@@ -126,7 +126,7 @@ export default {
     earnAddPlace: 'إضافة مكان جديد',
     earnCertificate: 'رفع شهادة حلال',
     earnReview: 'كتابة تقييم',
-    earnVerify: 'التحقق من مكان',
+    earnVerify: 'تأكيد حالة الحلال',
     earnPhoto: 'رفع صورة',
     earnReport: 'الإبلاغ عن مكان',
     signOut: 'تسجيل الخروج',

@@ -156,6 +156,24 @@ export async function addPlace(input: AddPlaceInput, userId: string): Promise<Pl
 }
 
 /**
+ * Fetch the set of verification types this user has submitted for this place.
+ * Used client-side to disable already-used actions (confirm / flag_closed / flag_not_halal).
+ */
+export async function fetchUserVerifications(
+  placeId: string,
+  userId: string
+): Promise<Verification['type'][]> {
+  const { data, error } = await supabase
+    .from('verifications')
+    .select('type')
+    .eq('place_id', placeId)
+    .eq('user_id', userId);
+
+  if (error) return [];
+  return (data ?? []).map((row: { type: Verification['type'] }) => row.type);
+}
+
+/**
  * Verify/confirm a place's Halal status.
  */
 export async function verifyPlace(

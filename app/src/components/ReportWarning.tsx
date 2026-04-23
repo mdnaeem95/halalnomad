@@ -1,7 +1,8 @@
 import React from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { borderRadius, colors, spacing, typography } from '../constants/theme';
+import { AppColors, borderRadius, spacing, typography } from '../constants/theme';
+import { useTheme } from '../hooks/useTheme';
 
 interface Props {
   closedReports: number;
@@ -29,40 +30,44 @@ function getTrustStatus(closedReports: number, notHalalReports: number): TrustSt
   return 'danger';
 }
 
-const STATUS_CONFIG: Record<TrustStatus, {
+function getStatusConfig(c: AppColors): Record<TrustStatus, {
   icon: keyof typeof Ionicons.glyphMap;
   color: string;
   label: string;
-}> = {
-  clean: {
-    icon: 'shield-checkmark',
-    color: colors.success,
-    label: 'No recent reports',
-  },
-  caution: {
-    icon: 'information-circle',
-    color: colors.warning,
-    label: '',
-  },
-  warning: {
-    icon: 'warning',
-    color: colors.warning,
-    label: '',
-  },
-  danger: {
-    icon: 'warning',
-    color: colors.error,
-    label: '',
-  },
-};
+}> {
+  return {
+    clean: {
+      icon: 'shield-checkmark',
+      color: c.success,
+      label: 'No recent reports',
+    },
+    caution: {
+      icon: 'information-circle',
+      color: c.warning,
+      label: '',
+    },
+    warning: {
+      icon: 'warning',
+      color: c.warning,
+      label: '',
+    },
+    danger: {
+      icon: 'warning',
+      color: c.error,
+      label: '',
+    },
+  };
+}
 
 /**
  * Compact trust snapshot for PlaceCard list items.
  * Always visible — shows either "no reports" or the warning.
  */
 function CompactSnapshot({ closedReports, notHalalReports, verificationCount = 0 }: Props) {
+  const { colors: c } = useTheme();
+  const compactStyles = React.useMemo(() => createCompactStyles(c), [c]);
   const status = getTrustStatus(closedReports, notHalalReports);
-  const config = STATUS_CONFIG[status];
+  const config = getStatusConfig(c)[status];
 
   if (status === 'clean') {
     return (
@@ -98,7 +103,7 @@ function CompactSnapshot({ closedReports, notHalalReports, verificationCount = 0
   );
 }
 
-const compactStyles = StyleSheet.create({
+const createCompactStyles = (_c: AppColors) => StyleSheet.create({
   badge: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -125,6 +130,9 @@ export function ReportWarning({
   verificationCount = 0,
   compact = false,
 }: Props) {
+  const { colors: c } = useTheme();
+  const styles = React.useMemo(() => createStyles(c), [c]);
+
   if (compact) {
     return (
       <CompactSnapshot
@@ -143,7 +151,7 @@ export function ReportWarning({
   return (
     <View style={styles.container}>
       <View style={styles.titleRow}>
-        <Ionicons name="warning" size={16} color={colors.warning} />
+        <Ionicons name="warning" size={16} color={c.warning} />
         <Text style={styles.title}>Community Reports</Text>
       </View>
 
@@ -181,7 +189,9 @@ function WarningRow({
   count: number;
   confidence: number;
 }) {
-  const barColor = confidence >= 65 ? colors.error : colors.warning;
+  const { colors: c } = useTheme();
+  const styles = React.useMemo(() => createStyles(c), [c]);
+  const barColor = confidence >= 65 ? c.error : c.warning;
 
   return (
     <View style={styles.row}>
@@ -210,14 +220,14 @@ function WarningRow({
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (c: AppColors) => StyleSheet.create({
   container: {
     marginHorizontal: spacing.md,
     marginBottom: spacing.sm,
-    backgroundColor: colors.warning + '08',
+    backgroundColor: c.warning + '08',
     borderRadius: borderRadius.lg,
     borderWidth: 1,
-    borderColor: colors.warning + '25',
+    borderColor: c.warning + '25',
     padding: spacing.md,
     gap: spacing.sm,
   },
@@ -229,7 +239,7 @@ const styles = StyleSheet.create({
   },
   title: {
     ...typography.label,
-    color: colors.warning,
+    color: c.warning,
     fontSize: 13,
   },
   row: {
@@ -247,7 +257,7 @@ const styles = StyleSheet.create({
   },
   count: {
     ...typography.caption,
-    color: colors.textTertiary,
+    color: c.textTertiary,
   },
   barContainer: {
     flexDirection: 'row',
@@ -258,7 +268,7 @@ const styles = StyleSheet.create({
   barBackground: {
     flex: 1,
     height: 6,
-    backgroundColor: colors.divider,
+    backgroundColor: c.divider,
     borderRadius: 3,
     overflow: 'hidden',
   },
@@ -274,7 +284,7 @@ const styles = StyleSheet.create({
   },
   disclaimer: {
     ...typography.caption,
-    color: colors.textTertiary,
+    color: c.textTertiary,
     fontStyle: 'italic',
     marginTop: 2,
   },

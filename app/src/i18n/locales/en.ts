@@ -134,7 +134,7 @@ export default {
     earnAddPlace: 'Add a new place',
     earnCertificate: 'Upload Halal certificate',
     earnReview: 'Write a review',
-    earnVerify: 'Verify a place',
+    earnVerify: 'Confirm Halal status',
     earnPhoto: 'Upload a photo',
     earnReport: 'Report a place',
     signOut: 'Sign Out',

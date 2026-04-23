@@ -13,14 +13,17 @@ import { Ionicons } from '@expo/vector-icons';
 import { useForm, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useAuth } from '../src/hooks/useAuth';
+import { useTheme } from '../src/hooks/useTheme';
 import { signInSchema, signUpSchema, SignInInput, SignUpInput } from '../src/lib/schemas';
 import { AppDialog } from '../src/components/AppDialog';
-import { borderRadius, colors, spacing, typography } from '../src/constants/theme';
+import { AppColors, borderRadius, spacing, typography } from '../src/constants/theme';
 
 type Mode = 'signin' | 'signup' | 'verify';
 
 export default function AuthScreen() {
   const { signIn, signUp } = useAuth();
+  const { colors: c } = useTheme();
+  const styles = React.useMemo(() => createStyles(c), [c]);
   const [mode, setMode] = useState<Mode>('signin');
   const [isLoading, setIsLoading] = useState(false);
   const [verifyEmail, setVerifyEmail] = useState('');
@@ -103,7 +106,7 @@ export default function AuthScreen() {
       <View style={styles.container}>
         <View style={styles.content}>
           <View style={styles.iconCircle}>
-            <Ionicons name="mail-outline" size={40} color={colors.primary} />
+            <Ionicons name="mail-outline" size={40} color={c.primary} />
           </View>
 
           <Text style={styles.title}>Check your email</Text>
@@ -170,7 +173,7 @@ export default function AuthScreen() {
                   onChangeText={onChange}
                   onBlur={onBlur}
                   autoCapitalize="words"
-                  placeholderTextColor={colors.textTertiary}
+                  placeholderTextColor={c.textTertiary}
                 />
               )}
             />
@@ -191,7 +194,7 @@ export default function AuthScreen() {
                   keyboardType="email-address"
                   autoCapitalize="none"
                   autoCorrect={false}
-                  placeholderTextColor={colors.textTertiary}
+                  placeholderTextColor={c.textTertiary}
                 />
               )}
             />
@@ -210,7 +213,7 @@ export default function AuthScreen() {
                   onChangeText={onChange}
                   onBlur={onBlur}
                   secureTextEntry
-                  placeholderTextColor={colors.textTertiary}
+                  placeholderTextColor={c.textTertiary}
                 />
               )}
             />
@@ -233,7 +236,7 @@ export default function AuthScreen() {
                   keyboardType="email-address"
                   autoCapitalize="none"
                   autoCorrect={false}
-                  placeholderTextColor={colors.textTertiary}
+                  placeholderTextColor={c.textTertiary}
                 />
               )}
             />
@@ -252,7 +255,7 @@ export default function AuthScreen() {
                   onChangeText={onChange}
                   onBlur={onBlur}
                   secureTextEntry
-                  placeholderTextColor={colors.textTertiary}
+                  placeholderTextColor={c.textTertiary}
                 />
               )}
             />
@@ -300,10 +303,10 @@ export default function AuthScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (c: AppColors) => StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: colors.background,
+    backgroundColor: c.background,
   },
   content: {
     flex: 1,
@@ -316,49 +319,49 @@ const styles = StyleSheet.create({
     width: 80,
     height: 80,
     borderRadius: 40,
-    backgroundColor: colors.primaryLight + '18',
+    backgroundColor: c.primaryLight + '18',
     justifyContent: 'center',
     alignItems: 'center',
     marginBottom: spacing.sm,
   },
   title: {
     ...typography.h1,
-    color: colors.textPrimary,
+    color: c.textPrimary,
     textAlign: 'center',
   },
   subtitle: {
     ...typography.body,
-    color: colors.textSecondary,
+    color: c.textSecondary,
     textAlign: 'center',
     lineHeight: 24,
   },
   emailHighlight: {
     ...typography.label,
-    color: colors.primary,
+    color: c.primary,
     fontSize: 16,
     textAlign: 'center',
   },
   input: {
-    backgroundColor: colors.white,
+    backgroundColor: c.surface,
     borderRadius: borderRadius.md,
     paddingHorizontal: spacing.md,
     paddingVertical: 14,
     ...typography.body,
-    color: colors.textPrimary,
+    color: c.textPrimary,
     borderWidth: 1,
-    borderColor: colors.border,
+    borderColor: c.border,
     width: '100%',
   },
   inputError: {
-    borderColor: colors.error,
+    borderColor: c.error,
   },
   errorText: {
     ...typography.caption,
-    color: colors.error,
+    color: c.error,
     alignSelf: 'flex-start',
   },
   primaryButton: {
-    backgroundColor: colors.primary,
+    backgroundColor: c.primary,
     borderRadius: borderRadius.md,
     paddingVertical: 16,
     alignItems: 'center',
@@ -367,7 +370,7 @@ const styles = StyleSheet.create({
   },
   primaryButtonText: {
     ...typography.label,
-    color: colors.white,
+    color: c.textOnPrimary,
     fontSize: 16,
   },
   buttonDisabled: {
@@ -379,7 +382,7 @@ const styles = StyleSheet.create({
   },
   switchText: {
     ...typography.bodySmall,
-    color: colors.primary,
+    color: c.primary,
     fontWeight: '600',
   },
 });

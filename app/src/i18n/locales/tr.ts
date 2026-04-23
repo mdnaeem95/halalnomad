@@ -126,7 +126,7 @@ export default {
     earnAddPlace: 'Yeni mekan ekle',
     earnCertificate: 'Helal sertifikası yükle',
     earnReview: 'Yorum yaz',
-    earnVerify: 'Mekan doğrula',
+    earnVerify: 'Helal durumunu onayla',
     earnPhoto: 'Fotoğraf yükle',
     earnReport: 'Mekan bildir',
     signOut: 'Çıkış Yap',

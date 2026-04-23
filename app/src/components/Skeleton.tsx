@@ -1,11 +1,12 @@
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useMemo, useRef } from 'react';
 import { Animated, StyleSheet, View } from 'react-native';
 import {
+  AppColors,
   borderRadius,
-  colors,
   shadows,
   spacing,
 } from '../constants/theme';
+import { useTheme } from '../hooks/useTheme';
 
 /**
  * Animated shimmer block using plain RN Animated API.
@@ -16,6 +17,7 @@ function ShimmerBlock({ width, height, radius = borderRadius.sm }: {
   radius?: number;
 }) {
   const opacity = useRef(new Animated.Value(0.4)).current;
+  const { colors: c } = useTheme();
 
   useEffect(() => {
     Animated.loop(
@@ -32,7 +34,7 @@ function ShimmerBlock({ width, height, radius = borderRadius.sm }: {
         width,
         height,
         borderRadius: radius,
-        backgroundColor: colors.border,
+        backgroundColor: c.border,
         opacity,
       }}
     />
@@ -40,6 +42,8 @@ function ShimmerBlock({ width, height, radius = borderRadius.sm }: {
 }
 
 export function PlaceCardSkeleton() {
+  const { colors: c } = useTheme();
+  const s = useMemo(() => createStyles(c), [c]);
   return (
     <View style={s.card}>
       <ShimmerBlock width="100%" height={140} radius={0} />
@@ -60,6 +64,8 @@ export function PlaceCardSkeleton() {
 }
 
 export function PlaceListSkeleton({ count = 4 }: { count?: number }) {
+  const { colors: c } = useTheme();
+  const s = useMemo(() => createStyles(c), [c]);
   return (
     <View style={s.list}>
       {Array.from({ length: count }).map((_, i) => (
@@ -70,6 +76,8 @@ export function PlaceListSkeleton({ count = 4 }: { count?: number }) {
 }
 
 export function PlaceDetailSkeleton() {
+  const { colors: c } = useTheme();
+  const s = useMemo(() => createStyles(c), [c]);
   return (
     <View style={s.detail}>
       <ShimmerBlock width="100%" height={220} radius={0} />
@@ -91,9 +99,9 @@ export function PlaceDetailSkeleton() {
   );
 }
 
-const s = StyleSheet.create({
+const createStyles = (c: AppColors) => StyleSheet.create({
   card: {
-    backgroundColor: colors.surface,
+    backgroundColor: c.surface,
     borderRadius: borderRadius.lg,
     overflow: 'hidden',
     ...shadows.md,
@@ -103,10 +111,10 @@ const s = StyleSheet.create({
   content: { padding: spacing.md, gap: 8 },
   row: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
   list: { paddingTop: spacing.sm },
-  detail: { flex: 1, backgroundColor: colors.background },
+  detail: { flex: 1, backgroundColor: c.background },
   detailContent: { padding: spacing.md, gap: 10 },
   detailCard: {
-    backgroundColor: colors.white,
+    backgroundColor: c.surface,
     borderRadius: borderRadius.lg,
     padding: spacing.md,
     gap: 8,

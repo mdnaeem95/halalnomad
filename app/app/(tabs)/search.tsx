@@ -19,8 +19,8 @@ import { PlaceCard } from '../../src/components/PlaceCard';
 import { PremiumLockBanner } from '../../src/components/PremiumGate';
 import { PlaceListSkeleton } from '../../src/components/Skeleton';
 import {
+  AppColors,
   borderRadius,
-  colors,
   shadows,
   spacing,
   typography,
@@ -41,6 +41,7 @@ function useDebounce<T>(value: T, delay: number): T {
 
 export default function SearchScreen() {
   const { colors: c } = useTheme();
+  const styles = React.useMemo(() => createStyles(c), [c]);
   const { isPremium } = usePremium();
   const searchQuery = useAppStore((s) => s.searchQuery);
   const setSearchQuery = useAppStore((s) => s.setSearchQuery);
@@ -142,8 +143,8 @@ export default function SearchScreen() {
             <RefreshControl
               refreshing={isRefetching}
               onRefresh={refetch}
-              tintColor={colors.primary}
-              colors={[colors.primary]}
+              tintColor={c.primary}
+              colors={[c.primary]}
             />
           }
           ListEmptyComponent={
@@ -168,10 +169,10 @@ export default function SearchScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (c: AppColors) => StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: colors.background,
+    backgroundColor: c.background,
   },
   searchBar: {
     flexDirection: 'row',
@@ -180,12 +181,12 @@ const styles = StyleSheet.create({
   },
   input: {
     flex: 1,
-    backgroundColor: colors.white,
+    backgroundColor: c.surface,
     borderRadius: borderRadius.md,
     paddingHorizontal: spacing.md,
     paddingVertical: spacing.sm,
     ...typography.body,
-    color: colors.textPrimary,
+    color: c.textPrimary,
     ...shadows.sm,
   },
   clearButton: {
@@ -194,7 +195,7 @@ const styles = StyleSheet.create({
   },
   clearText: {
     ...typography.label,
-    color: colors.textTertiary,
+    color: c.textTertiary,
   },
   chipScroll: {
     flexGrow: 0,
@@ -207,25 +208,25 @@ const styles = StyleSheet.create({
     gap: spacing.sm,
   },
   chip: {
-    backgroundColor: colors.white,
+    backgroundColor: c.surface,
     borderRadius: 20,
     paddingHorizontal: 16,
     paddingVertical: 8,
     borderWidth: 1,
-    borderColor: colors.border,
+    borderColor: c.border,
   },
   chipActive: {
-    backgroundColor: colors.primary,
-    borderColor: colors.primary,
+    backgroundColor: c.primary,
+    borderColor: c.primary,
   },
   chipText: {
     ...typography.caption,
-    color: colors.textSecondary,
+    color: c.textSecondary,
     fontWeight: '600',
     flexShrink: 0,
   },
   chipTextActive: {
-    color: colors.white,
+    color: c.textOnPrimary,
   },
   list: {
     paddingTop: spacing.sm,
@@ -240,12 +241,12 @@ const styles = StyleSheet.create({
   },
   emptyText: {
     ...typography.body,
-    color: colors.textSecondary,
+    color: c.textSecondary,
     textAlign: 'center',
   },
   emptySubtext: {
     ...typography.bodySmall,
-    color: colors.textTertiary,
+    color: c.textTertiary,
     marginTop: spacing.xs,
     textAlign: 'center',
   },

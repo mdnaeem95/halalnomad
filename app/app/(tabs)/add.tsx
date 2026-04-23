@@ -23,8 +23,8 @@ import { addPlaceSchema, AddPlaceInput } from '../../src/lib/schemas';
 import { CuisineType, CUISINE_LABELS, PriceRange, PRICE_LABELS } from '../../src/types';
 import { AppDialog, Toast } from '../../src/components/AppDialog';
 import {
+  AppColors,
   borderRadius,
-  colors,
   spacing,
   typography,
 } from '../../src/constants/theme';
@@ -33,9 +33,10 @@ const CUISINE_OPTIONS = Object.entries(CUISINE_LABELS) as [CuisineType, string][
 const PRICE_OPTIONS = Object.entries(PRICE_LABELS) as [string, string][];
 
 export default function AddPlaceScreen() {
-  const { user } = useAuth();
+  const { user, refreshProfile } = useAuth();
   const { location } = useLocation();
   const { colors: c } = useTheme();
+  const styles = React.useMemo(() => createStyles(c), [c]);
   const addPlaceMutation = useAddPlace();
   const [photos, setPhotos] = useState<string[]>([]);
   const [pinLocation, setPinLocation] = useState<{ latitude: number; longitude: number } | null>(null);
@@ -82,7 +83,7 @@ export default function AddPlaceScreen() {
     return (
       <View style={styles.centered}>
         <View style={styles.iconCircle}>
-          <Ionicons name="add-circle-outline" size={36} color={colors.primaryLight} />
+          <Ionicons name="add-circle-outline" size={36} color={c.primaryLight} />
         </View>
         <Text style={styles.title}>Sign in to contribute</Text>
         <Text style={styles.subtitle}>
@@ -139,6 +140,7 @@ export default function AddPlaceScreen() {
       },
       {
         onSuccess: () => {
+          refreshProfile();
           setDialog({
             visible: true,
             variant: 'success',
@@ -386,7 +388,7 @@ export default function AddPlaceScreen() {
 
           <Text style={[styles.sectionTitle, { color: c.textPrimary }]}>Photos</Text>
           <Pressable style={styles.photoButton} onPress={handlePickPhoto}>
-            <Ionicons name="camera-outline" size={20} color={colors.primary} />
+            <Ionicons name="camera-outline" size={20} color={c.primary} />
             <Text style={styles.photoButtonText}>
               {photos.length > 0
                 ? `${photos.length} photo${photos.length > 1 ? 's' : ''} selected`
@@ -425,22 +427,23 @@ export default function AddPlaceScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (c: AppColors) => StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: colors.background,
+    backgroundColor: c.background,
   },
   centered: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
     padding: spacing.xl,
+    backgroundColor: c.background,
   },
   iconCircle: {
     width: 80,
     height: 80,
     borderRadius: 40,
-    backgroundColor: colors.primaryLight + '20',
+    backgroundColor: c.primaryLight + '20',
     justifyContent: 'center',
     alignItems: 'center',
     marginBottom: spacing.lg,
@@ -451,44 +454,44 @@ const styles = StyleSheet.create({
   },
   title: {
     ...typography.h2,
-    color: colors.textPrimary,
+    color: c.textPrimary,
     marginBottom: spacing.sm,
   },
   subtitle: {
     ...typography.body,
-    color: colors.textSecondary,
+    color: c.textSecondary,
     textAlign: 'center',
     marginBottom: spacing.lg,
     lineHeight: 24,
   },
   sectionTitle: {
     ...typography.h3,
-    color: colors.textPrimary,
+    color: c.textPrimary,
     marginTop: spacing.lg,
     marginBottom: spacing.sm,
   },
   fieldLabel: {
     ...typography.label,
-    color: colors.textSecondary,
+    color: c.textSecondary,
     marginTop: spacing.md,
     marginBottom: spacing.xs,
   },
   input: {
-    backgroundColor: colors.white,
+    backgroundColor: c.surface,
     borderRadius: borderRadius.md,
     paddingHorizontal: spacing.md,
     paddingVertical: 12,
     ...typography.body,
-    color: colors.textPrimary,
+    color: c.textPrimary,
     borderWidth: 1,
-    borderColor: colors.border,
+    borderColor: c.border,
   },
   inputError: {
-    borderColor: colors.error,
+    borderColor: c.error,
   },
   errorText: {
     ...typography.caption,
-    color: colors.error,
+    color: c.error,
     marginTop: 4,
   },
   textArea: {
@@ -501,30 +504,30 @@ const styles = StyleSheet.create({
     gap: spacing.sm,
   },
   chip: {
-    backgroundColor: colors.white,
+    backgroundColor: c.surface,
     borderRadius: 20,
     paddingHorizontal: 14,
     paddingVertical: 6,
     borderWidth: 1,
-    borderColor: colors.border,
+    borderColor: c.border,
   },
   chipActive: {
-    backgroundColor: colors.primary,
-    borderColor: colors.primary,
+    backgroundColor: c.primary,
+    borderColor: c.primary,
   },
   chipText: {
     ...typography.caption,
-    color: colors.textSecondary,
+    color: c.textSecondary,
     fontWeight: '600',
   },
   chipTextActive: {
-    color: colors.white,
+    color: c.textOnPrimary,
   },
   mapPickerContainer: {
     borderRadius: borderRadius.lg,
     overflow: 'hidden',
     borderWidth: 1,
-    borderColor: colors.border,
+    borderColor: c.border,
     marginTop: spacing.xs,
   },
   mapPicker: {
@@ -543,12 +546,12 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
   photoButton: {
-    backgroundColor: colors.white,
+    backgroundColor: c.surface,
     borderRadius: borderRadius.md,
     padding: spacing.md,
     alignItems: 'center',
     borderWidth: 1,
-    borderColor: colors.border,
+    borderColor: c.border,
     borderStyle: 'dashed',
     flexDirection: 'row',
     justifyContent: 'center',
@@ -556,10 +559,10 @@ const styles = StyleSheet.create({
   },
   photoButtonText: {
     ...typography.label,
-    color: colors.primary,
+    color: c.primary,
   },
   primaryButton: {
-    backgroundColor: colors.primary,
+    backgroundColor: c.primary,
     borderRadius: borderRadius.md,
     padding: spacing.md,
     alignItems: 'center',
@@ -567,7 +570,7 @@ const styles = StyleSheet.create({
   },
   primaryButtonText: {
     ...typography.label,
-    color: colors.white,
+    color: c.textOnPrimary,
     fontSize: 16,
   },
   buttonDisabled: {

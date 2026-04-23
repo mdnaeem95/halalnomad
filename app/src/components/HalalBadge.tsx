@@ -1,7 +1,8 @@
 import React from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 import { HalalLevel, HALAL_LEVEL_LABELS } from '../types';
-import { borderRadius, colors, HALAL_LEVEL_COLORS, typography } from '../constants/theme';
+import { AppColors, borderRadius, typography } from '../constants/theme';
+import { useTheme } from '../hooks/useTheme';
 
 interface Props {
   level: HalalLevel;
@@ -9,7 +10,9 @@ interface Props {
 }
 
 export function HalalBadge({ level, compact = false }: Props) {
-  const color = HALAL_LEVEL_COLORS[level];
+  const { colors: c, halalLevelColors } = useTheme();
+  const styles = React.useMemo(() => createStyles(c), [c]);
+  const color = halalLevelColors[level];
   const label = HALAL_LEVEL_LABELS[level];
 
   if (compact) {
@@ -38,7 +41,7 @@ export function HalalBadge({ level, compact = false }: Props) {
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (c: AppColors) => StyleSheet.create({
   badge: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -67,7 +70,7 @@ const styles = StyleSheet.create({
   },
   compactText: {
     ...typography.caption,
-    color: colors.white,
+    color: c.textOnPrimary,
     fontWeight: '700',
     fontSize: 11,
   },

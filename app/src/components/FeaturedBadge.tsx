@@ -2,7 +2,8 @@ import React from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useTranslation } from 'react-i18next';
-import { borderRadius, colors, typography } from '../constants/theme';
+import { AppColors, borderRadius, typography } from '../constants/theme';
+import { useTheme } from '../hooks/useTheme';
 
 interface Props {
   tier: 'highlighted' | 'promoted' | 'spotlight';
@@ -10,11 +11,13 @@ interface Props {
 
 export function FeaturedBadge({ tier }: Props) {
   const { t } = useTranslation();
+  const { colors: c } = useTheme();
+  const styles = React.useMemo(() => createStyles(c), [c]);
 
   const tierConfig = {
-    highlighted: { bg: colors.accent + '20', color: colors.accent },
-    promoted: { bg: colors.accent + '30', color: colors.accent },
-    spotlight: { bg: colors.accent, color: colors.white },
+    highlighted: { bg: c.accent + '20', color: c.accent },
+    promoted: { bg: c.accent + '30', color: c.accent },
+    spotlight: { bg: c.accent, color: c.textOnPrimary },
   };
 
   const config = tierConfig[tier];
@@ -33,7 +36,7 @@ export function FeaturedBadge({ tier }: Props) {
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (c: AppColors) => StyleSheet.create({
   badge: {
     flexDirection: 'row',
     alignItems: 'center',

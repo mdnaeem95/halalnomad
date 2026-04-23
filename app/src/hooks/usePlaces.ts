@@ -4,6 +4,7 @@ import {
   fetchNearbyPlaces,
   fetchPlace,
   fetchReviews,
+  fetchUserVerifications,
   searchPlaces,
   addPlace as addPlaceApi,
   verifyPlace as verifyPlaceApi,
@@ -27,6 +28,8 @@ export const placeKeys = {
   search: (query: string, cuisine?: CuisineType | null) =>
     ['places', 'search', query, cuisine] as const,
   reviews: (placeId: string) => ['places', 'reviews', placeId] as const,
+  userVerifications: (placeId: string, userId: string) =>
+    ['places', 'user-verifications', placeId, userId] as const,
 };
 
 // ============================================
@@ -76,6 +79,27 @@ export function useReviews(placeId: string) {
     queryKey: placeKeys.reviews(placeId),
     queryFn: () => fetchReviews(placeId),
   });
+}
+
+/**
+ * Returns which verification types the current user has already submitted
+ * for this place. Used to disable already-used actions in the UI.
+ */
+export function useUserVerifications(placeId: string | undefined, userId: string | undefined) {
+  const query = useQuery({
+    queryKey: placeKeys.userVerifications(placeId ?? '', userId ?? ''),
+    queryFn: () => fetchUserVerifications(placeId!, userId!),
+    enabled: !!placeId && !!userId,
+  });
+
+  const types = query.data ?? [];
+  return {
+    hasConfirmed: types.includes('confirm'),
+    hasFlaggedClosed: types.includes('flag_closed'),
+    hasFlaggedNotHalal: types.includes('flag_not_halal'),
+    hasUploadedCertificate: types.includes('certificate'),
+    isLoading: query.isLoading,
+  };
 }
 
 // ============================================
@@ -173,9 +197,12 @@ export function useVerifyPlace() {
       captureError(error, { mutation: 'verifyPlace', placeId });
     },
 
-    onSettled: (_data, _err, { placeId, type }) => {
+    onSettled: (_data, _err, { placeId, userId, type }) => {
       queryClient.invalidateQueries({ queryKey: placeKeys.detail(placeId) });
       queryClient.invalidateQueries({ queryKey: placeKeys.all });
+      queryClient.invalidateQueries({
+        queryKey: placeKeys.userVerifications(placeId, userId),
+      });
 
       if (!_err) {
         if (type === 'confirm') {

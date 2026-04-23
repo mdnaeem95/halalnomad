@@ -26,8 +26,8 @@ import { MapPin } from '../../src/components/MapPin';
 import { PlaceListSkeleton } from '../../src/components/Skeleton';
 import { LoadingSplash } from '../../src/components/LoadingSplash';
 import {
+  AppColors,
   borderRadius,
-  colors,
   HALAL_LEVEL_COLORS,
   shadows,
   spacing,
@@ -38,6 +38,7 @@ export default function ExploreScreen() {
   const { location, region, isLoading: locationLoading } = useLocation();
   const { data: places = [], isLoading, refetch, isRefetching } = useNearbyPlaces(location);
   const { colors: c, halalLevelColors } = useTheme();
+  const styles = React.useMemo(() => createStyles(c), [c]);
   const viewMode = useAppStore((s) => s.exploreViewMode);
   const setViewMode = useAppStore((s) => s.setExploreViewMode);
   const mapRef = useRef<MapView>(null);
@@ -269,10 +270,10 @@ export default function ExploreScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (c: AppColors) => StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: colors.background,
+    backgroundColor: c.background,
   },
   centered: {
     flex: 1,
@@ -283,7 +284,7 @@ const styles = StyleSheet.create({
   toggleContainer: {
     flexDirection: 'row',
     margin: spacing.sm,
-    backgroundColor: colors.divider,
+    backgroundColor: c.divider,
     borderRadius: borderRadius.md,
     padding: 3,
   },
@@ -297,7 +298,7 @@ const styles = StyleSheet.create({
     borderRadius: borderRadius.sm,
   },
   toggleActive: {
-    backgroundColor: colors.white,
+    backgroundColor: c.surface,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 1 },
     shadowOpacity: 0.1,
@@ -306,7 +307,7 @@ const styles = StyleSheet.create({
   },
   toggleText: {
     ...typography.caption,
-    color: colors.textTertiary,
+    color: c.textTertiary,
     fontWeight: '600',
   },
   mapContainer: {
@@ -319,7 +320,7 @@ const styles = StyleSheet.create({
     position: 'absolute',
     bottom: spacing.lg,
     alignSelf: 'center',
-    backgroundColor: colors.white,
+    backgroundColor: c.surface,
     paddingHorizontal: spacing.md,
     paddingVertical: spacing.sm,
     borderRadius: borderRadius.full,
@@ -330,7 +331,7 @@ const styles = StyleSheet.create({
   },
   placeCountText: {
     ...typography.label,
-    color: colors.primary,
+    color: c.primary,
   },
   list: {
     paddingTop: spacing.sm,
@@ -338,12 +339,12 @@ const styles = StyleSheet.create({
   },
   emptyText: {
     ...typography.body,
-    color: colors.textSecondary,
+    color: c.textSecondary,
     textAlign: 'center',
   },
   emptySubtext: {
     ...typography.bodySmall,
-    color: colors.textTertiary,
+    color: c.textTertiary,
     marginTop: spacing.xs,
   },
   carouselContainer: {

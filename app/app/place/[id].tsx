@@ -15,7 +15,7 @@ import { useAuth } from '../../src/hooks/useAuth';
 import { useLocation } from '../../src/hooks/useLocation';
 import { useTheme } from '../../src/hooks/useTheme';
 import { useCooldown } from '../../src/hooks/useCooldown';
-import { usePlace, useReviews, useVerifyPlace } from '../../src/hooks/usePlaces';
+import { usePlace, useReviews, useUserVerifications, useVerifyPlace } from '../../src/hooks/usePlaces';
 import { getMapProvider } from '../../src/services/map';
 import { CUISINE_LABELS, PRICE_LABELS } from '../../src/types';
 import { HalalBadge } from '../../src/components/HalalBadge';
@@ -25,8 +25,8 @@ import { ReportWarning } from '../../src/components/ReportWarning';
 import { PlaceDetailSkeleton } from '../../src/components/Skeleton';
 import { AppDialog, Toast } from '../../src/components/AppDialog';
 import {
+  AppColors,
   borderRadius,
-  colors,
   shadows,
   spacing,
   typography,
@@ -34,12 +34,17 @@ import {
 
 export default function PlaceDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
-  const { user } = useAuth();
+  const { user, refreshProfile } = useAuth();
   const { location } = useLocation();
 
   const { data: place, isLoading: placeLoading } = usePlace(id);
   const { data: reviews = [] } = useReviews(id ?? '');
+  const { hasConfirmed, hasFlaggedClosed, hasFlaggedNotHalal } = useUserVerifications(
+    id,
+    user?.id
+  );
   const { colors: c } = useTheme();
+  const styles = React.useMemo(() => createStyles(c), [c]);
   const { requirePremium } = usePremiumGuard();
   const verifyMutation = useVerifyPlace();
   const { isOnCooldown: verifyOnCooldown, trigger: triggerVerify } = useCooldown(5000);
@@ -84,14 +89,18 @@ export default function PlaceDetailScreen() {
       });
       return;
     }
+    if (hasConfirmed) return;
 
     triggerVerify(() => {
-      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-      showToast('Halal status confirmed! +15 points');
       verifyMutation.mutate(
         { placeId: place.id, userId: user.id, type: 'confirm' },
         {
-          onError: () => showToast('Already verified or failed', 'error'),
+          onSuccess: () => {
+            Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+            showToast('Halal status confirmed! +15 points');
+            refreshProfile();
+          },
+          onError: () => showToast('Could not confirm — please try again', 'error'),
         }
       );
     });
@@ -99,6 +108,9 @@ export default function PlaceDetailScreen() {
 
   function handleFlag(type: 'flag_closed' | 'flag_not_halal') {
     if (!user || !place) return;
+    if (type === 'flag_closed' && hasFlaggedClosed) return;
+    if (type === 'flag_not_halal' && hasFlaggedNotHalal) return;
+
     const label = type === 'flag_closed' ? 'closed' : 'not Halal';
 
     setDialog({
@@ -113,10 +125,13 @@ export default function PlaceDetailScreen() {
           onPress: () => {
             closeDialog();
             triggerReport(() => {
-              showToast('Report submitted. +10 points');
               verifyMutation.mutate(
                 { placeId: place.id, userId: user.id, type },
                 {
+                  onSuccess: () => {
+                    showToast('Report submitted. +10 points');
+                    refreshProfile();
+                  },
                   onError: () => showToast('Failed to report', 'error'),
                 }
               );
@@ -287,38 +302,60 @@ export default function PlaceDetailScreen() {
           </Pressable>
 
           <Pressable
-            style={[styles.verifyButton, { backgroundColor: c.surface, borderColor: c.primaryLight }, (verifyMutation.isPending || verifyOnCooldown) && styles.buttonDisabled]}
+            style={[
+              styles.verifyButton,
+              { backgroundColor: hasConfirmed ? c.primaryLight + '18' : c.surface, borderColor: c.primaryLight },
+              (verifyMutation.isPending || verifyOnCooldown || hasConfirmed) && styles.buttonDisabled,
+            ]}
             onPress={handleVerify}
-            disabled={verifyMutation.isPending || verifyOnCooldown}
+            disabled={verifyMutation.isPending || verifyOnCooldown || hasConfirmed}
             accessibilityRole="button"
-            accessibilityLabel="Confirm this place is Halal"
-            accessibilityHint="Awards you 15 points"
-            accessibilityState={{ disabled: verifyMutation.isPending || verifyOnCooldown }}
+            accessibilityLabel={hasConfirmed ? 'You have already confirmed this place as Halal' : 'Confirm this place is Halal'}
+            accessibilityHint={hasConfirmed ? undefined : 'Awards you 15 points'}
+            accessibilityState={{ disabled: verifyMutation.isPending || verifyOnCooldown || hasConfirmed }}
           >
-            <Ionicons name="checkmark-circle-outline" size={18} color={c.primaryLight} />
-            <Text style={styles.verifyButtonText}>Confirm Halal</Text>
+            <Ionicons
+              name={hasConfirmed ? 'checkmark-circle' : 'checkmark-circle-outline'}
+              size={18}
+              color={c.primaryLight}
+            />
+            <Text style={styles.verifyButtonText}>
+              {hasConfirmed ? 'You verified this' : 'Confirm Halal'}
+            </Text>
           </Pressable>
 
           <View style={styles.flagRow}>
             <Pressable
-              style={[styles.flagButton, { backgroundColor: c.surface, borderColor: c.border }, reportOnCooldown && styles.buttonDisabled]}
+              style={[
+                styles.flagButton,
+                { backgroundColor: c.surface, borderColor: c.border },
+                (reportOnCooldown || hasFlaggedClosed) && styles.buttonDisabled,
+              ]}
               onPress={() => handleFlag('flag_closed')}
-              disabled={reportOnCooldown}
+              disabled={reportOnCooldown || hasFlaggedClosed}
               accessibilityRole="button"
-              accessibilityLabel="Report this place as closed"
-              accessibilityState={{ disabled: reportOnCooldown }}
+              accessibilityLabel={hasFlaggedClosed ? 'You have already reported this place as closed' : 'Report this place as closed'}
+              accessibilityState={{ disabled: reportOnCooldown || hasFlaggedClosed }}
             >
-              <Text style={[styles.flagButtonText, { color: c.textSecondary }]}>Report Closed</Text>
+              <Text style={[styles.flagButtonText, { color: c.textSecondary }]}>
+                {hasFlaggedClosed ? 'Reported Closed' : 'Report Closed'}
+              </Text>
             </Pressable>
             <Pressable
-              style={[styles.flagButton, { backgroundColor: c.surface, borderColor: c.border }, reportOnCooldown && styles.buttonDisabled]}
+              style={[
+                styles.flagButton,
+                { backgroundColor: c.surface, borderColor: c.border },
+                (reportOnCooldown || hasFlaggedNotHalal) && styles.buttonDisabled,
+              ]}
               onPress={() => handleFlag('flag_not_halal')}
-              disabled={reportOnCooldown}
+              disabled={reportOnCooldown || hasFlaggedNotHalal}
               accessibilityRole="button"
-              accessibilityLabel="Report this place as not Halal"
-              accessibilityState={{ disabled: reportOnCooldown }}
+              accessibilityLabel={hasFlaggedNotHalal ? 'You have already reported this place as not Halal' : 'Report this place as not Halal'}
+              accessibilityState={{ disabled: reportOnCooldown || hasFlaggedNotHalal }}
             >
-              <Text style={[styles.flagButtonText, { color: c.textSecondary }]}>Report Not Halal</Text>
+              <Text style={[styles.flagButtonText, { color: c.textSecondary }]}>
+                {hasFlaggedNotHalal ? 'Reported Not Halal' : 'Report Not Halal'}
+              </Text>
             </Pressable>
           </View>
         </View>
@@ -365,10 +402,10 @@ export default function PlaceDetailScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (c: AppColors) => StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: colors.background,
+    backgroundColor: c.background,
   },
   content: {
     paddingBottom: spacing.xxl,
@@ -380,7 +417,7 @@ const styles = StyleSheet.create({
   },
   errorText: {
     ...typography.body,
-    color: colors.textSecondary,
+    color: c.textSecondary,
   },
   photos: {
     height: 220,
@@ -389,7 +426,7 @@ const styles = StyleSheet.create({
     width: 320,
     height: 220,
     marginEnd: 2,
-    backgroundColor: colors.border,
+    backgroundColor: c.border,
   },
   header: {
     padding: spacing.md,
@@ -397,20 +434,20 @@ const styles = StyleSheet.create({
   },
   name: {
     ...typography.h1,
-    color: colors.textPrimary,
+    color: c.textPrimary,
   },
   localName: {
     ...typography.h3,
-    color: colors.textSecondary,
+    color: c.textSecondary,
     fontWeight: '400',
   },
   verificationCount: {
     ...typography.caption,
-    color: colors.textTertiary,
+    color: c.textTertiary,
     marginTop: spacing.xs,
   },
   detailsCard: {
-    backgroundColor: colors.white,
+    backgroundColor: c.surface,
     marginHorizontal: spacing.md,
     borderRadius: borderRadius.lg,
     ...shadows.sm,
@@ -428,7 +465,7 @@ const styles = StyleSheet.create({
   },
   localAddress: {
     ...typography.bodySmall,
-    color: colors.textSecondary,
+    color: c.textSecondary,
     marginTop: 2,
   },
   detailRow: {
@@ -437,17 +474,17 @@ const styles = StyleSheet.create({
   },
   detailLabel: {
     ...typography.caption,
-    color: colors.textTertiary,
+    color: c.textTertiary,
     textTransform: 'uppercase',
     letterSpacing: 0.5,
   },
   detailValue: {
     ...typography.body,
-    color: colors.textPrimary,
+    color: c.textPrimary,
   },
   divider: {
     height: 1,
-    backgroundColor: colors.divider,
+    backgroundColor: c.divider,
     marginHorizontal: spacing.md,
   },
   actions: {
@@ -455,7 +492,7 @@ const styles = StyleSheet.create({
     gap: spacing.sm,
   },
   primaryButton: {
-    backgroundColor: colors.primary,
+    backgroundColor: c.primary,
     borderRadius: borderRadius.md,
     padding: 14,
     alignItems: 'center',
@@ -465,7 +502,7 @@ const styles = StyleSheet.create({
   },
   primaryButtonText: {
     ...typography.label,
-    color: colors.white,
+    color: c.textOnPrimary,
     fontSize: 16,
   },
   saveButton: {
@@ -489,23 +526,23 @@ const styles = StyleSheet.create({
   premiumBadgeText: {
     fontSize: 9,
     fontWeight: '800',
-    color: colors.white,
+    color: c.textOnPrimary,
     letterSpacing: 0.5,
   },
   verifyButton: {
-    backgroundColor: colors.white,
+    backgroundColor: c.surface,
     borderRadius: borderRadius.md,
     padding: 14,
     alignItems: 'center',
     borderWidth: 2,
-    borderColor: colors.primaryLight,
+    borderColor: c.primaryLight,
     flexDirection: 'row',
     justifyContent: 'center',
     gap: spacing.sm,
   },
   verifyButtonText: {
     ...typography.label,
-    color: colors.primaryLight,
+    color: c.primaryLight,
     fontSize: 16,
   },
   buttonDisabled: {
@@ -517,16 +554,16 @@ const styles = StyleSheet.create({
   },
   flagButton: {
     flex: 1,
-    backgroundColor: colors.white,
+    backgroundColor: c.surface,
     borderRadius: borderRadius.md,
     padding: 12,
     alignItems: 'center',
     borderWidth: 1,
-    borderColor: colors.border,
+    borderColor: c.border,
   },
   flagButtonText: {
     ...typography.caption,
-    color: colors.textSecondary,
+    color: c.textSecondary,
     fontWeight: '600',
   },
   reviewsSection: {
@@ -534,16 +571,16 @@ const styles = StyleSheet.create({
   },
   sectionTitle: {
     ...typography.h3,
-    color: colors.textPrimary,
+    color: c.textPrimary,
     marginBottom: spacing.sm,
   },
   noReviews: {
     ...typography.bodySmall,
-    color: colors.textTertiary,
+    color: c.textTertiary,
     fontStyle: 'italic',
   },
   reviewCard: {
-    backgroundColor: colors.white,
+    backgroundColor: c.surface,
     borderRadius: borderRadius.md,
     padding: spacing.md,
     marginBottom: spacing.sm,
@@ -556,15 +593,15 @@ const styles = StyleSheet.create({
   },
   reviewerName: {
     ...typography.label,
-    color: colors.textPrimary,
+    color: c.textPrimary,
   },
   reviewRating: {
     fontSize: 14,
-    color: colors.accent,
+    color: c.accent,
   },
   reviewText: {
     ...typography.bodySmall,
-    color: colors.textSecondary,
+    color: c.textSecondary,
     lineHeight: 20,
   },
 });
