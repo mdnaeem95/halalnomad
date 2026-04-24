@@ -1,1 +1,4 @@
 .DS_Store
+
+# Private strategy notes — kept out of git intentionally
+/planning/
