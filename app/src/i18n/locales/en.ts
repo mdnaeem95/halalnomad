@@ -195,7 +195,7 @@ export default {
     errorMessage: 'Something went wrong. Please try again or contact support.',
     restored: 'Subscription restored!',
     noSubscription: 'No previous subscription found.',
-    legal: 'Payment is charged to your App Store or Google Play account. Subscription auto-renews unless cancelled at least 24 hours before the end of the current period.',
+    legal: 'Payment is charged to your {{store}} account. Subscription auto-renews unless cancelled at least 24 hours before the end of the current period.',
   },
 
   // Featured listing

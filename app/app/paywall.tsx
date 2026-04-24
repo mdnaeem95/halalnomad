@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import {
   ActivityIndicator,
   Linking,
+  Platform,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -196,7 +197,11 @@ export default function PaywallScreen() {
           <Text style={[styles.restoreText, { color: c.primary }]}>{t('paywall.restore')}</Text>
         </Pressable>
 
-        <Text style={[styles.legal, { color: c.textTertiary }]}>{t('paywall.legal')}</Text>
+        <Text style={[styles.legal, { color: c.textTertiary }]}>
+          {t('paywall.legal', {
+            store: Platform.OS === 'ios' ? 'App Store' : 'Google Play',
+          })}
+        </Text>
 
         <View style={styles.legalLinks}>
           <Pressable onPress={() => Linking.openURL('https://mdnaeem95.github.io/halalnomad/terms')}>
