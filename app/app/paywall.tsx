@@ -15,7 +15,6 @@ import { useTranslation } from 'react-i18next';
 import { usePremium } from '../src/hooks/usePremium';
 import { useTheme } from '../src/hooks/useTheme';
 import { AppDialog, Toast } from '../src/components/AppDialog';
-import { getRevenueCatDiagnostics } from '../src/lib/revenue-cat';
 import {
   borderRadius,
   shadows,
@@ -188,35 +187,6 @@ export default function PaywallScreen() {
           </Text>
         </Pressable>
 
-        {/* TEMP: production diagnostic — visible only when offerings fail to load.
-            Remove once TestFlight subscriptions are confirmed working. */}
-        {!isLoading && packages.length === 0 && (() => {
-          const d = getRevenueCatDiagnostics();
-          return (
-            <View
-              style={{
-                marginTop: spacing.md,
-                padding: spacing.md,
-                backgroundColor: c.surface,
-                borderRadius: borderRadius.md,
-                borderWidth: 1,
-                borderColor: c.error + '40',
-              }}
-            >
-              <Text style={{ ...typography.caption, color: c.error, fontWeight: '700', marginBottom: 4 }}>
-                Subscription diagnostics
-              </Text>
-              <Text style={{ ...typography.caption, color: c.textSecondary }}>
-                key: {d.apiKeyPrefix ? `${d.apiKeyPrefix}…` : 'MISSING'}
-                {'\n'}configured: {String(d.configured)}
-                {'\n'}offerings total: {d.offeringCount}
-                {'\n'}current offering: {d.currentOfferingId ?? 'null'}
-                {'\n'}packages: {d.packageCount}
-                {'\n'}error: {d.lastOfferingsError ?? 'none'}
-              </Text>
-            </View>
-          );
-        })()}
 
         {/* Restore */}
         <Pressable

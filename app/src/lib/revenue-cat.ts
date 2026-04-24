@@ -8,34 +8,6 @@ import Purchases, {
 const REVENUECAT_IOS_KEY = process.env.EXPO_PUBLIC_REVENUECAT_IOS_KEY;
 const REVENUECAT_ANDROID_KEY = process.env.EXPO_PUBLIC_REVENUECAT_ANDROID_KEY;
 
-// In-memory diagnostic state. Read via getRevenueCatDiagnostics() and surfaced
-// on the paywall when packages are empty, so we can debug production builds
-// without a JS console. Remove once TestFlight subscriptions are confirmed
-// working and the app ships.
-export type RevenueCatDiagnostics = {
-  apiKeyPrefix: string | null;
-  configured: boolean;
-  lastOfferingsError: string | null;
-  lastOfferingsEmpty: boolean | null;
-  offeringCount: number;
-  currentOfferingId: string | null;
-  packageCount: number;
-};
-
-const diag: RevenueCatDiagnostics = {
-  apiKeyPrefix: null,
-  configured: false,
-  lastOfferingsError: null,
-  lastOfferingsEmpty: null,
-  offeringCount: 0,
-  currentOfferingId: null,
-  packageCount: 0,
-};
-
-export function getRevenueCatDiagnostics(): RevenueCatDiagnostics {
-  return { ...diag };
-}
-
 /**
  * Initialize RevenueCat.
  * Call once on app launch after auth is resolved.
@@ -44,13 +16,9 @@ export async function initRevenueCat(userId?: string) {
   const apiKey = Platform.OS === 'ios' ? REVENUECAT_IOS_KEY : REVENUECAT_ANDROID_KEY;
 
   if (!apiKey) {
-    diag.apiKeyPrefix = null;
-    diag.configured = false;
     console.warn('RevenueCat API key not configured — subscriptions disabled');
     return;
   }
-
-  diag.apiKeyPrefix = apiKey.slice(0, 5);
 
   if (__DEV__) {
     Purchases.setLogLevel(LOG_LEVEL.DEBUG);
@@ -60,7 +28,6 @@ export async function initRevenueCat(userId?: string) {
     apiKey,
     appUserID: userId ?? undefined,
   });
-  diag.configured = true;
 }
 
 /**
@@ -104,26 +71,13 @@ export async function checkPremiumStatus(): Promise<boolean> {
 export async function getOfferings(): Promise<PurchasesPackage[]> {
   try {
     const offerings = await Purchases.getOfferings();
-    diag.offeringCount = Object.keys(offerings.all ?? {}).length;
     const current = offerings.current;
-    diag.currentOfferingId = current?.identifier ?? null;
-    diag.lastOfferingsError = null;
-
     if (!current) {
-      diag.lastOfferingsEmpty = true;
-      diag.packageCount = 0;
       console.warn('RevenueCat: no current offering configured');
       return [];
     }
-    const pkgs = current.availablePackages;
-    diag.packageCount = pkgs.length;
-    diag.lastOfferingsEmpty = pkgs.length === 0;
-    return pkgs;
+    return current.availablePackages;
   } catch (e) {
-    const msg = e instanceof Error ? `${e.name}: ${e.message}` : String(e);
-    diag.lastOfferingsError = msg;
-    diag.lastOfferingsEmpty = null;
-    diag.packageCount = 0;
     console.warn('RevenueCat getOfferings failed:', e);
     return [];
   }
