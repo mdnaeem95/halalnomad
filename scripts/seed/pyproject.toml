@@ -11,3 +11,12 @@ dependencies = [
     "typer>=0.12.0",
     "rich>=13.7.0",
 ]
+
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools]
+# Flat layout with multiple top-level scripts. Be explicit so setuptools
+# doesn't try to auto-discover and bail out.
+py-modules = ["cities", "db", "google_places", "promote"]

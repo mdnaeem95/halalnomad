@@ -273,11 +273,13 @@ def cmd_scrape(
     summary = {
         "fetched": 0,
         "details_skipped": 0,
+        "dup_in_batch": 0,
         "dup_in_staging": 0,
         "dup_in_places": 0,
         "staged": 0,
     }
     rows_to_insert: list[dict[str, Any]] = []
+    seen_place_ids: set[str] = set()  # in-batch dedup; districts often overlap
 
     with httpx.Client() as client, Progress(
         SpinnerColumn(),
@@ -299,6 +301,10 @@ def cmd_scrape(
                 progress.update(task, advance=1)
 
                 # Cheap dedup checks first — avoid Place Details cost on dups.
+                if nr.place_id in seen_place_ids:
+                    summary["dup_in_batch"] += 1
+                    continue
+                seen_place_ids.add(nr.place_id)
                 if already_staged(client, nr.place_id):
                     summary["dup_in_staging"] += 1
                     continue
@@ -334,13 +340,17 @@ def cmd_scrape(
         print("[yellow]Nothing new to stage.[/]")
         return
 
-    # Bulk insert in chunks of 100 to keep request size sane.
+    # Bulk upsert in chunks. ignore_duplicates=True makes (source, source_id)
+    # collisions a no-op rather than an error — backstop for future runs that
+    # might rescrape (e.g. accidentally rerunning a partially-completed scrape).
     inserted = 0
     for i in range(0, len(rows_to_insert), 100):
         chunk = rows_to_insert[i : i + 100]
-        supa().table("places_staging").insert(chunk).execute()
+        supa().table("places_staging").upsert(
+            chunk, on_conflict="source,source_id", ignore_duplicates=True
+        ).execute()
         inserted += len(chunk)
-    print(f"[green]✓ Inserted {inserted} rows into places_staging.[/]")
+    print(f"[green]✓ Upserted {inserted} rows into places_staging.[/]")
     print(f"  Review in Supabase Studio:")
     print(f"  SELECT * FROM places_staging WHERE city = '{city}' AND reviewed = false;")
 
