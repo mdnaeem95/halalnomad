@@ -217,6 +217,8 @@ Numbered sequentially in `app/src/lib/migration-*.sql`. Current set:
 - `004` — featured listings (`is_featured`, `featured_tier`)
 - `005` — `push_token` on profiles
 - `006` — notifications infra (queue, log, triggers, profile fields)
+- `007` — `places_staging` table + `places.sources` JSONB +
+  `promote_staged_place()` RPC for the seed-data pipeline
 
 **Run them manually in Supabase SQL Editor.** No migration runner yet.
 When adding a new one, keep the number sequence and document the
@@ -250,6 +252,18 @@ older OTA. Full detail in [docs/release.md](docs/release.md).
 JS-only fixes: `npx eas-cli update --branch production --platform ios
 --message "..."` — skips App Review, usually live within a couple of
 cold starts.
+
+### Seeding place data
+
+Pipeline lives in `scripts/seed/` (Python). Per-city runbook in
+[scripts/seed/README.md](scripts/seed/README.md) — follow it step by
+step for each new city, capturing the breakdown via
+`python report.py breakdown <city>` at each stage. Cities prioritised
+in `planning/data-sourcing-strategy.md`.
+
+Default trust on seeded rows is `halal_level: 1` (Reported).
+Community verifications upgrade from there. Cert-body sources can land
+at level 4, but Google Places never does.
 
 ## Known pitfalls (things we've already been burned by)
 

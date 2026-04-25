@@ -82,87 +82,165 @@ source .venv/bin/activate
 pip install -e .
 ```
 
-## Daily workflow
+## Per-city runbook
 
-### Scrape one city
+Use this exact sequence for every new city. Capture the breakdown at
+each stage — that's how we'll know whether the auto-rules are getting
+better or worse over time.
+
+Replace `tokyo` with the city you're working on.
+
+### 1. Scrape
 
 ```bash
-# Smoke test on 2 districts first
-python google_places.py scrape tokyo --max-districts 2 --dry-run
-
-# Real run
 python google_places.py scrape tokyo
 ```
 
-Typical output: ~150-300 raw rows per tier-1 city, takes 5-10 minutes,
-costs <$5 in API calls.
+Typical: ~150-400 staged rows per tier-1 city, 5-10 minutes,
+~$5-10 in API. The summary table at the end tells you fetched / dup /
+staged.
 
-### Review in Supabase Studio
+### 2. Snapshot the initial state
+
+```bash
+python report.py breakdown tokyo
+```
+
+You'll see all rows as `pending`. Save this output (paste into a notes
+file). This is the baseline.
+
+### 3. Auto-approve known halal markers
+
+Preview first:
+
+```bash
+python report.py auto-approve tokyo --dry-run
+```
+
+If the count looks right (typically 50-70% of pending), apply:
+
+```bash
+python report.py auto-approve tokyo
+```
+
+### 4. Auto-reject known non-halal chains
+
+```bash
+python report.py auto-reject tokyo --dry-run
+python report.py auto-reject tokyo
+```
+
+### 5. Snapshot post-auto state
+
+```bash
+python report.py breakdown tokyo
+```
+
+Whatever's still `pending` is your manual queue. Paste this output
+alongside the baseline so we can see how much auto-action handled.
+
+### 6. Manual review of remaining pending rows
+
+In Supabase SQL Editor:
 
 ```sql
--- Pending review
-SELECT id, name_en, address_en, latitude, longitude, cuisine_type, source_url
+SELECT id, name_en, address_en, cuisine_type, source_url
 FROM places_staging
 WHERE city = 'tokyo' AND reviewed = false
 ORDER BY created_at;
+```
 
--- Approve a row
+For each: open `source_url` in a new tab, look for halal certificate /
+Arabic signage / Muslim-friendly signal. 5 seconds per row.
+
+```sql
+-- Approve one
 UPDATE places_staging
 SET reviewed = true, approved = true
 WHERE id = '<uuid>';
 
 -- Reject with reason
 UPDATE places_staging
-SET reviewed = true, approved = false, rejected_reason = 'not actually halal — only halal-friendly options'
+SET reviewed = true, approved = false, rejected_reason = 'no halal signal'
 WHERE id = '<uuid>';
 
--- Bulk-approve a sanity-check region
+-- Bulk-reject anything still pending after manual pass (catch-all)
 UPDATE places_staging
-SET reviewed = true, approved = true
-WHERE city = 'tokyo'
-  AND id IN ('uuid-1', 'uuid-2', 'uuid-3', ...);
+SET reviewed = true, approved = false, rejected_reason = 'ambiguous, defer to community'
+WHERE city = 'tokyo' AND reviewed = false;
 ```
 
-Review heuristic — auto-skip / reject:
+When done: nothing should still be `pending`.
 
-- **Reject** if name is generic (e.g. "Cafe", "Restaurant") with no halal
-  signal in name or address
-- **Reject** if it's a chain that you know isn't halal in this country
-  (e.g. McDonald's Japan)
-- **Reject** if the address is a residential block with no business
-- **Approve** if the name contains "Halal", "Muslim", "Mosque",
-  Middle-Eastern/Indian/Pakistani/Indonesian cuisine markers
-- **Approve** if `source_url` opens to a Google listing with
-  Muslim-friendly photos / certificate visible
-- **Defer** (leave unreviewed) if you're not sure — these can pile up
-  for a future Ambassador-tier user to handle
-
-Aim for 80%+ approval rate. If you're auto-approving everything, your
-keyword filtering is too loose.
-
-### Promote approved rows
+### 7. Snapshot final review state
 
 ```bash
-# Show counts first
+python report.py breakdown tokyo
+```
+
+You'll see splits across `approved` / `rejected`. Total approval rate
+should be 70-95% depending on how strict you were.
+
+### 8. Promote into the live places table
+
+```bash
 python promote.py status --city tokyo
-
-# Dry run — see what would happen
 python promote.py run --city tokyo --dry-run
-
-# For real
 python promote.py run --city tokyo
 ```
 
-After promote, push an OTA (so any cached app instances refetch):
+### 9. Push an OTA so the app picks up the new data
 
 ```bash
 cd ../../app
 npx eas-cli update --branch production --platform ios --message "Tokyo seed batch 1"
 ```
 
-(Strictly speaking, the app will pick up new places via TanStack Query
-cache invalidation eventually, but a fresh OTA bumps the runtime so
-it's a clean break.)
+(JS-only OTA — the data lives server-side, but bumping the OTA
+revalidates query caches faster on existing installs.)
+
+### 10. Final breakdown (optional)
+
+```bash
+python report.py breakdown tokyo
+```
+
+`promoted` count should equal `approved` count. If not, some rows
+failed promotion — investigate before moving on (likely missing
+coordinates or some other data issue surfaced by the RPC).
+
+### Per-city template to capture in your notes
+
+```
+City: <name>
+Date: <YYYY-MM-DD>
+Scrape time: <minutes>, API cost: <USD>
+
+Stage 1 — fetched / staged: <X> / <Y>     (dup_in_batch: <Z>)
+Stage 2 — pending after auto-approve: <X> (approved: <Y>)
+Stage 3 — pending after auto-reject:  <X> (rejected: <Y>)
+Stage 4 — manual review: <X>              (approved: <Y>, rejected: <Z>)
+Stage 5 — promoted into places: <X>
+
+Cuisine breakdown of approved:
+  <copy from `report.py breakdown` output>
+
+Notes / surprises / regex tweaks needed:
+  <free text>
+```
+
+## Tuning the auto-rules over time
+
+The keyword regexes live in `report.py` constants:
+
+- `APPROVE_NAME_REGEX` — name patterns that auto-approve
+- `APPROVE_CUISINES` — cuisine types that auto-approve
+- `REJECT_NAME_REGEX` — chains that auto-reject
+
+After every 2-3 cities, look at what slipped through to manual review
+and ask: was there a pattern I could've added? Add it to the constant.
+Conservative bias — false-approves are worse than false-rejects since
+they pollute the live data and we'd rely on community to catch them.
 
 ## Multi-city run
 
