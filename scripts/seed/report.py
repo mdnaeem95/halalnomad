@@ -42,7 +42,7 @@ APPROVE_CUISINES = ("middle_eastern", "indian", "malay_indonesian")
 # Non-halal chains that consistently appear in scrapes. Lowercase, regex.
 REJECT_NAME_REGEX = (
     r"mcdonald|kfc|starbucks|burger king|subway|7-?eleven|family ?mart|"
-    r"lawson|matsuya|yoshinoya|sukiya|coco ?ichibanya|ootoya|saizeriya|"
+    r"lawson|yoshinoya|coco ?ichibanya|ootoya|saizeriya|"
     r"jollibee|pizza hut|domino|wendy|tim ?ho ?wan"
 )
 
@@ -147,26 +147,28 @@ def cmd_auto_approve(
     dry_run: bool = typer.Option(False, help="Show count without writing."),
 ) -> None:
     """Mark obviously-halal pending rows as approved."""
-    # Match either the name regex OR a halal-leaning cuisine.
-    base = (
+    import re
+
+    # One fetch of all pending rows for this city, then filter in Python.
+    # (supabase-py mutates the builder chain across calls — sharing it
+    # between two queries silently inherits the first query's filters.)
+    rows = (
         supa()
         .table("places_staging")
         .select("id, name_en, cuisine_type")
         .eq("city", city.lower())
         .eq("reviewed", False)
+        .execute()
+        .data
     )
-    cuisine_match = base.in_("cuisine_type", list(APPROVE_CUISINES)).execute().data
-    name_match = base.ilike("name_en", "%").execute().data  # fetch all pending; filter in Python for regex
-
-    import re
 
     pat = re.compile(APPROVE_NAME_REGEX, re.IGNORECASE)
-    by_id: dict[str, dict[str, Any]] = {r["id"]: r for r in cuisine_match}
-    for r in name_match:
-        if pat.search(r["name_en"] or ""):
-            by_id[r["id"]] = r
-
-    matches = list(by_id.values())
+    matches = [
+        r
+        for r in rows
+        if r.get("cuisine_type") in APPROVE_CUISINES
+        or pat.search(r.get("name_en") or "")
+    ]
     print(f"[bold]Auto-approve: {len(matches)} pending rows match the rules.[/]")
     if not matches:
         return
