@@ -174,6 +174,54 @@ def infer_cuisine(name: str, types: list[str]) -> str:
     return "other"
 
 
+# Order matters — first match wins. Restaurant is the default fallback.
+PLACE_TYPE_RULES: list[tuple[str, list[str], list[str]]] = [
+    # (place_type, google_types_match, name_keywords)
+    (
+        "grocery",
+        ["supermarket", "grocery_or_supermarket", "convenience_store"],
+        ["mart", "grocery", "supermarket", "halal shop", "asian shop", "asian store",
+         "halal store", "minimart", "groceries"],
+    ),
+    (
+        "butcher",
+        [],
+        ["butcher", "meat shop", "meat house", "halal meat"],
+    ),
+    (
+        "bakery",
+        ["bakery"],
+        ["bakery", "patisserie", "boulangerie", "bread shop"],
+    ),
+    (
+        "sweet_shop",
+        [],
+        ["confectionery", "sweet shop", "sweets", "chocolate", "ice cream"],
+    ),
+    (
+        "cafe",
+        ["cafe", "coffee_shop"],
+        ["coffee", "espresso", "tea house", "tea room"],
+    ),
+    (
+        "street_food",
+        [],
+        ["food truck", "street food", "stall", "food stall"],
+    ),
+]
+
+
+def infer_place_type(name: str, types: list[str]) -> str:
+    name_lower = name.lower()
+    types_lower = {t.lower() for t in types}
+    for place_type, type_match, keyword_match in PLACE_TYPE_RULES:
+        if any(t in types_lower for t in type_match):
+            return place_type
+        if any(k in name_lower for k in keyword_match):
+            return place_type
+    return "restaurant"
+
+
 # --- Dedupe -----------------------------------------------------------------
 
 
@@ -235,6 +283,7 @@ def stage_row(
         "latitude": nr.lat,
         "longitude": nr.lng,
         "cuisine_type": infer_cuisine(nr.name, nr.types),
+        "place_type": infer_place_type(nr.name, nr.types),
         "price_range": (details or {}).get("price_level") or nr.price_level,
         "phone": (details or {}).get("international_phone_number"),
         "website": (details or {}).get("website"),

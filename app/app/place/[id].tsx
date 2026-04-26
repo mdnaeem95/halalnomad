@@ -17,7 +17,7 @@ import { useTheme } from '../../src/hooks/useTheme';
 import { useCooldown } from '../../src/hooks/useCooldown';
 import { usePlace, useReviews, useUserVerifications, useVerifyPlace } from '../../src/hooks/usePlaces';
 import { getMapProvider } from '../../src/services/map';
-import { CUISINE_LABELS, PRICE_LABELS } from '../../src/types';
+import { CUISINE_LABELS, PRICE_LABELS, PLACE_TYPE_LABELS } from '../../src/types';
 import { HalalBadge } from '../../src/components/HalalBadge';
 import { FeaturedBadge } from '../../src/components/FeaturedBadge';
 import { usePremiumGuard } from '../../src/components/PremiumGate';
@@ -239,6 +239,18 @@ export default function PlaceDetailScreen() {
             <Text style={[styles.detailLabel, { color: c.textTertiary }]}>Cuisine</Text>
             <Text style={[styles.detailValue, { color: c.textPrimary }]}>{CUISINE_LABELS[place.cuisine_type]}</Text>
           </View>
+
+          {place.place_type && place.place_type !== 'restaurant' && (
+            <>
+              <View style={[styles.divider, { backgroundColor: c.divider }]} />
+              <View style={styles.detailRow}>
+                <Text style={[styles.detailLabel, { color: c.textTertiary }]}>Type</Text>
+                <Text style={[styles.detailValue, { color: c.textPrimary }]}>
+                  {PLACE_TYPE_LABELS[place.place_type]}
+                </Text>
+              </View>
+            </>
+          )}
 
           {place.price_range && (
             <>

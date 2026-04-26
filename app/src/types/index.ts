@@ -56,6 +56,38 @@ export const CUISINE_LABELS: Record<CuisineType, string> = {
   other: 'Other',
 };
 
+export type PlaceType =
+  | 'restaurant'
+  | 'grocery'
+  | 'butcher'
+  | 'bakery'
+  | 'cafe'
+  | 'street_food'
+  | 'sweet_shop';
+
+// Labels and icons for non-restaurant types — shown as a small badge on
+// place cards / detail screens so a user looking for dinner doesn't get
+// a halal supermarket as the top result without context.
+export const PLACE_TYPE_LABELS: Record<PlaceType, string> = {
+  restaurant: 'Restaurant',
+  grocery: 'Grocery',
+  butcher: 'Butcher',
+  bakery: 'Bakery',
+  cafe: 'Cafe',
+  street_food: 'Street Food',
+  sweet_shop: 'Sweets',
+};
+
+// Ionicons name per place type — undefined means no badge (default case).
+export const PLACE_TYPE_ICONS: Partial<Record<PlaceType, string>> = {
+  grocery: 'basket-outline',
+  butcher: 'cut-outline',
+  bakery: 'pizza-outline',
+  cafe: 'cafe-outline',
+  street_food: 'fast-food-outline',
+  sweet_shop: 'ice-cream-outline',
+};
+
 export type PriceRange = 1 | 2 | 3 | 4;
 
 export const PRICE_LABELS: Record<PriceRange, string> = {
@@ -114,6 +146,7 @@ export interface Place {
   not_halal_reports: number;
   is_featured: boolean;
   featured_tier: 'highlighted' | 'promoted' | 'spotlight' | null;
+  place_type: PlaceType;
 }
 
 export interface Review {

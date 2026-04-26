@@ -219,6 +219,9 @@ Numbered sequentially in `app/src/lib/migration-*.sql`. Current set:
 - `006` — notifications infra (queue, log, triggers, profile fields)
 - `007` — `places_staging` table + `places.sources` JSONB +
   `promote_staged_place()` RPC for the seed-data pipeline
+- `008` — `place_type` column on `places` (and `places_staging`) so
+  groceries / butchers / bakeries / cafes / sweet shops surface
+  differently in the UI than restaurants
 
 **Run them manually in Supabase SQL Editor.** No migration runner yet.
 When adding a new one, keep the number sequence and document the

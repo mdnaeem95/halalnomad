@@ -3,7 +3,7 @@ import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { Image } from 'expo-image';
 import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
-import { Place, CUISINE_LABELS, PRICE_LABELS } from '../types';
+import { Place, CUISINE_LABELS, PRICE_LABELS, PLACE_TYPE_LABELS, PLACE_TYPE_ICONS } from '../types';
 import { useTheme } from '../hooks/useTheme';
 import {
   AppColors,
@@ -74,6 +74,18 @@ export function PlaceCard({ place, onPress, distance }: Props) {
           <Text style={[styles.cuisine, { color: c.primaryLight }]}>
             {CUISINE_LABELS[place.cuisine_type]}
           </Text>
+          {place.place_type && place.place_type !== 'restaurant' && (
+            <View style={styles.typePill}>
+              <Ionicons
+                name={(PLACE_TYPE_ICONS[place.place_type] ?? 'pricetag-outline') as React.ComponentProps<typeof Ionicons>['name']}
+                size={11}
+                color={c.accent}
+              />
+              <Text style={[styles.typePillText, { color: c.accent }]}>
+                {PLACE_TYPE_LABELS[place.place_type]}
+              </Text>
+            </View>
+          )}
           {place.price_range && (
             <Text style={styles.price}>{PRICE_LABELS[place.price_range]}</Text>
           )}
@@ -147,6 +159,20 @@ const createStyles = (c: AppColors) => StyleSheet.create({
   cuisine: {
     ...typography.caption,
     color: c.primaryLight,
+    fontWeight: '600',
+  },
+  typePill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 3,
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: borderRadius.sm,
+    backgroundColor: c.accent + '18',
+  },
+  typePillText: {
+    ...typography.caption,
+    color: c.accent,
     fontWeight: '600',
   },
   price: {
