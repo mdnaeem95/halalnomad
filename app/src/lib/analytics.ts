@@ -51,6 +51,12 @@ export const EVENTS = {
   SUBSCRIPTION_PURCHASED: 'subscription_purchased',
   SUBSCRIPTION_RESTORED: 'subscription_restored',
 
+  // Onboarding
+  ONBOARDING_VIEWED: 'onboarding_viewed',
+  ONBOARDING_SKIPPED_TO_DISCLAIMER: 'onboarding_skipped_to_disclaimer',
+  ONBOARDING_DISCLAIMER_ACKNOWLEDGED: 'onboarding_disclaimer_acknowledged',
+  ONBOARDING_COMPLETED: 'onboarding_completed',
+
   // Engagement
   LANGUAGE_CHANGED: 'language_changed',
   APP_RATING_PROMPTED: 'app_rating_prompted',

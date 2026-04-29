@@ -1,9 +1,10 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { useTranslation } from 'react-i18next';
 import { PersistQueryClientProvider } from '@tanstack/react-query-persist-client';
 import * as SplashScreen from 'expo-splash-screen';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { queryClient, asyncStoragePersister } from '../src/lib/query-client';
 import { AuthProvider, useAuth } from '../src/hooks/useAuth';
 import { NetworkProvider } from '../src/hooks/useNetwork';
@@ -12,9 +13,14 @@ import { useNotifications } from '../src/hooks/useNotifications';
 import { ErrorBoundary } from '../src/components/ErrorBoundary';
 import { OfflineBanner } from '../src/components/OfflineBanner';
 import { LoadingSplash } from '../src/components/LoadingSplash';
+import { Onboarding } from '../src/components/Onboarding';
 import { initSentry } from '../src/lib/sentry';
 import { initRevenueCat } from '../src/lib/revenue-cat';
 import '../src/i18n';
+
+// Bumping the suffix forces existing users through onboarding again
+// (e.g. when the disclaimer wording materially changes).
+const ONBOARDING_FLAG_KEY = 'onboarding_completed_v1';
 
 // Hold the native splash until the animated LoadingSplash is mounted,
 // so the green-on-green handoff is seamless.
@@ -27,6 +33,7 @@ function AppStack() {
   const { t } = useTranslation();
   const { colors, isDark } = useTheme();
   const { user, isLoading: authLoading } = useAuth();
+  const [onboardingDone, setOnboardingDone] = useState<boolean | null>(null);
   useNotifications(user?.id ?? null);
 
   useEffect(() => {
@@ -35,8 +42,33 @@ function AppStack() {
     SplashScreen.hideAsync().catch(() => {});
   }, []);
 
-  if (authLoading) {
+  useEffect(() => {
+    AsyncStorage.getItem(ONBOARDING_FLAG_KEY)
+      .then((v) => setOnboardingDone(v === 'true'))
+      .catch(() => setOnboardingDone(true)); // fail open — never block on storage
+  }, []);
+
+  async function handleOnboardingComplete() {
+    setOnboardingDone(true);
+    try {
+      await AsyncStorage.setItem(ONBOARDING_FLAG_KEY, 'true');
+    } catch {
+      // Persistence failed — they'll see onboarding again next launch.
+      // Acceptable; not blocking.
+    }
+  }
+
+  if (authLoading || onboardingDone === null) {
     return <LoadingSplash />;
+  }
+
+  if (!onboardingDone) {
+    return (
+      <>
+        <StatusBar style="light" />
+        <Onboarding onComplete={handleOnboardingComplete} />
+      </>
+    );
   }
 
   return (
