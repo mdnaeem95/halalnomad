@@ -38,10 +38,12 @@ export type SignUpInput = z.infer<typeof signUpSchema>;
 // PLACES
 // ============================================
 
+// Keep in sync with CuisineType in src/types/index.ts and CUISINE_KEYWORDS
+// in scripts/seed/google_places.py.
 const cuisineTypes = [
-  'chinese_muslim', 'middle_eastern', 'turkish', 'indian', 'pakistani',
-  'indonesian', 'malaysian', 'african', 'central_asian', 'japanese',
-  'korean', 'thai', 'mediterranean', 'western', 'other',
+  'chinese_muslim', 'central_asian', 'middle_eastern', 'indian',
+  'malay_indonesian', 'japanese', 'korean', 'chinese', 'thai',
+  'vietnamese', 'western', 'seafood', 'dessert', 'other',
 ] as const;
 
 export const addPlaceSchema = z.object({

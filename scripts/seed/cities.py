@@ -121,7 +121,88 @@ CITIES: dict[str, list[District]] = {
     "bangkok": BANGKOK,
     "singapore": SINGAPORE,
     "taipei": TAIPEI,
+    # Tier-2 cities below — popular Asian destinations with growing or
+    # established Muslim tourist traffic.
+    "hong_kong": [],  # populated below
+    "ho_chi_minh": [],
+    "hanoi": [],
+    "chiang_mai": [],
+    "phuket": [],
+    "manila": [],
 }
+
+
+# ============================================
+# Tier-2 districts
+# ============================================
+
+HONG_KONG = [
+    District("Tsim Sha Tsui", 22.2980, 114.1719),  # Kowloon Mosque area
+    District("Wan Chai", 22.2778, 114.1740),       # Wan Chai Mosque
+    District("Causeway Bay", 22.2802, 114.1854),
+    District("Mong Kok", 22.3193, 114.1694),
+    District("Central", 22.2818, 114.1582),
+    District("Sheung Wan", 22.2867, 114.1499),
+    District("Yau Ma Tei", 22.3137, 114.1707),
+    District("Tsuen Wan", 22.3719, 114.1141),
+]
+
+HO_CHI_MINH = [
+    District("District 1 — Dong Du Mosque area", 10.7770, 106.7042),
+    District("District 1 — Pham Ngu Lao", 10.7672, 106.6919),
+    District("District 1 — Ben Thanh", 10.7723, 106.6981),
+    District("District 3", 10.7820, 106.6868),
+    District("District 5 — Cholon", 10.7546, 106.6634),
+    District("District 7 — Phu My Hung", 10.7298, 106.7196),
+    District("Tan Binh", 10.8011, 106.6529),
+]
+
+HANOI = [
+    District("Old Quarter", 21.0341, 105.8500),
+    District("Hoan Kiem", 21.0285, 105.8542),
+    District("Ba Dinh — Hanoi Mosque area", 21.0365, 105.8295),
+    District("Tay Ho — expat area", 21.0710, 105.8240),
+    District("Cau Giay", 21.0339, 105.7853),
+    District("Dong Da", 21.0151, 105.8312),
+]
+
+CHIANG_MAI = [
+    District("Old City", 18.7892, 98.9851),
+    District("Nimman", 18.8003, 98.9698),
+    District("Night Bazaar", 18.7878, 98.9976),
+    District("Ban Haw Mosque area", 18.7888, 98.9942),
+    District("Chang Khlan", 18.7855, 98.9989),
+    District("Suthep", 18.7958, 98.9495),
+]
+
+PHUKET = [
+    District("Patong", 7.8956, 98.2967),
+    District("Karon", 7.8463, 98.2958),
+    District("Kata", 7.8181, 98.2982),
+    District("Phuket Town", 7.8804, 98.3923),
+    District("Bang Tao", 7.9920, 98.2958),
+    District("Old Phuket", 7.8843, 98.3892),
+    District("Chalong", 7.8400, 98.3411),
+]
+
+MANILA = [
+    District("Quiapo — Golden Mosque area", 14.5995, 120.9844),
+    District("Ermita", 14.5781, 120.9824),
+    District("Malate", 14.5686, 120.9849),
+    District("Makati", 14.5547, 121.0244),
+    District("Bonifacio Global City", 14.5500, 121.0500),
+    District("Salam Compound — Taguig", 14.5197, 121.0510),
+    District("Manila Bay area", 14.5824, 120.9786),
+]
+
+
+# Wire tier-2 entries into CITIES dict.
+CITIES["hong_kong"] = HONG_KONG
+CITIES["ho_chi_minh"] = HO_CHI_MINH
+CITIES["hanoi"] = HANOI
+CITIES["chiang_mai"] = CHIANG_MAI
+CITIES["phuket"] = PHUKET
+CITIES["manila"] = MANILA
 
 
 def list_cities() -> list[str]:

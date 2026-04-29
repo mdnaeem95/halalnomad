@@ -21,38 +21,40 @@ export const HALAL_LEVEL_LABELS: Record<HalalLevel, string> = {
   4: 'Trusted',
 };
 
+// Canonical cuisine types — used by the scraper, the API, and the UI.
+// When adding/changing: update CUISINE_LABELS and `scripts/seed/google_places.py`
+// CUISINE_KEYWORDS together so what's stored matches what the UI knows how
+// to display.
 export type CuisineType =
   | 'chinese_muslim'
-  | 'middle_eastern'
-  | 'turkish'
-  | 'indian'
-  | 'pakistani'
-  | 'indonesian'
-  | 'malaysian'
-  | 'african'
   | 'central_asian'
+  | 'middle_eastern'
+  | 'indian'
+  | 'malay_indonesian'
   | 'japanese'
   | 'korean'
+  | 'chinese'
   | 'thai'
-  | 'mediterranean'
+  | 'vietnamese'
   | 'western'
+  | 'seafood'
+  | 'dessert'
   | 'other';
 
 export const CUISINE_LABELS: Record<CuisineType, string> = {
   chinese_muslim: 'Chinese Muslim',
-  middle_eastern: 'Middle Eastern',
-  turkish: 'Turkish',
-  indian: 'Indian',
-  pakistani: 'Pakistani',
-  indonesian: 'Indonesian',
-  malaysian: 'Malaysian',
-  african: 'African',
   central_asian: 'Central Asian',
+  middle_eastern: 'Middle Eastern',
+  indian: 'Indian',
+  malay_indonesian: 'Malay / Indonesian',
   japanese: 'Japanese',
   korean: 'Korean',
+  chinese: 'Chinese',
   thai: 'Thai',
-  mediterranean: 'Mediterranean',
+  vietnamese: 'Vietnamese',
   western: 'Western',
+  seafood: 'Seafood',
+  dessert: 'Desserts',
   other: 'Other',
 };
 

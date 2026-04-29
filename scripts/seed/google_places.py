@@ -152,12 +152,17 @@ def fetch_details(client: httpx.Client, place_id: str) -> dict[str, Any] | None:
 # --- Cuisine inference ------------------------------------------------------
 
 CUISINE_KEYWORDS: list[tuple[str, list[str]]] = [
+    # Order matters — first match wins. Specific Muslim cuisines before
+    # broader regional buckets, otherwise e.g. "Lanzhou Halal Beef Noodle"
+    # gets tagged as generic chinese (matches "noodle").
+    ("chinese_muslim", ["hui", "lanzhou", "xinjiang", "halal beef noodle", "清真", "qingzhen"]),
+    ("central_asian", ["uyghur", "uighur", "uzbek", "samarkand", "kazakh", "kyrgyz"]),
     ("japanese", ["japanese", "ramen", "sushi", "izakaya", "udon", "soba", "tempura"]),
     ("korean", ["korean", "bbq", "bibimbap"]),
     ("chinese", ["chinese", "dim sum", "dumpling", "noodle"]),
-    ("indian", ["indian", "biryani", "curry house", "tandoor"]),
-    ("middle_eastern", ["kebab", "shawarma", "falafel", "turkish", "arab", "persian", "lebanese", "iranian"]),
-    ("malay_indonesian", ["malay", "indonesian", "nasi", "rendang"]),
+    ("indian", ["indian", "biryani", "curry house", "tandoor", "nepali", "bangladeshi"]),
+    ("middle_eastern", ["kebab", "shawarma", "falafel", "turkish", "arab", "persian", "lebanese", "iranian", "yemeni", "syrian"]),
+    ("malay_indonesian", ["malay", "indonesian", "nasi", "rendang", "warung"]),
     ("thai", ["thai"]),
     ("vietnamese", ["vietnamese", "pho", "banh mi"]),
     ("western", ["pizza", "burger", "steakhouse", "italian", "american"]),

@@ -32,12 +32,21 @@ app = typer.Typer(add_completion=False, no_args_is_help=True)
 
 # Halal-positive name signals + cuisine types that almost always pass review.
 # When tuning: add new signals here, never remove unless a regression appears.
+# Non-English markers added after the Seoul/Bangkok runs surfaced names
+# we missed because our regex was English-only.
 APPROVE_NAME_REGEX = (
+    # English / transliterated halal cuisine markers
     r"halal|muslim|kebab|biryani|tandoor|shawarma|pakistani|rendang|nasi|"
-    r"turkish|persian|iranian|arab|lebanese|moroccan|egyptian|"
-    r"masjid|mosque|qaboos|sultan"
+    r"turkish|persian|iranian|arab|lebanese|moroccan|egyptian|yemeni|"
+    r"uyghur|uighur|xinjiang|lanzhou|hui|samarkand|uzbek|"
+    r"masjid|mosque|qaboos|sultan|"
+    # CJK / Thai / Korean halal markers
+    r"清真|"            # Chinese: halal (huí cuisine)
+    r"ハラル|ハラール|"  # Japanese: halal (two common spellings)
+    r"할랄|이슬람|무슬림|"  # Korean: halal / Islam / Muslim
+    r"ฮาลาล"            # Thai: halal
 )
-APPROVE_CUISINES = ("middle_eastern", "indian", "malay_indonesian")
+APPROVE_CUISINES = ("middle_eastern", "indian", "malay_indonesian", "chinese_muslim", "central_asian")
 
 # Non-halal chains that consistently appear in scrapes. Lowercase, regex.
 REJECT_NAME_REGEX = (
