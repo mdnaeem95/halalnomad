@@ -187,6 +187,61 @@ you want centralised cron management outside Supabase.
 
 3. **No edge function changes needed** — the generic drain handles it.
 
+## Lifecycle campaigns (welcome + dormancy)
+
+Beyond transactional triggers, we run two scheduled campaigns that
+scan the user base periodically and enqueue notifications:
+
+- **`welcome`** — 24-48h after signup, exactly once per user
+- **`dormancy_7d`** — 7-8 days after `last_active_at`, max once per
+  30-day window
+
+Both are defined in
+[`migration-010-lifecycle-notifications.sql`](../app/src/lib/migration-010-lifecycle-notifications.sql)
+as SQL functions:
+
+- `enqueue_welcome_notifications()` — runs hourly (`0 * * * *`)
+- `enqueue_dormancy_notifications()` — runs daily at 10:00 UTC (`0 10 * * *`)
+
+Both are **idempotent** — they check `notifications_log` AND
+`notifications_queue` for prior sends/pending, so re-running never
+causes double-sends. The same machinery the per-user transactional
+triggers use applies (opt-out check, quiet hours, push_token check).
+
+### Manual usage
+
+```sql
+-- See what's eligible right now without enqueueing
+select id, email, created_at
+from profiles
+where created_at between now() - interval '48 hours' and now() - interval '24 hours'
+  and notifications_enabled = true
+  and push_token is not null;
+
+-- Trigger immediately (for testing)
+select enqueue_welcome_notifications();
+select enqueue_dormancy_notifications();
+
+-- Disable a campaign
+select cron.unschedule('enqueue-welcome');
+select cron.unschedule('enqueue-dormancy-7d');
+```
+
+### Adding a new lifecycle campaign
+
+1. Write a SQL function `enqueue_<name>_notifications()` that does an
+   `INSERT INTO notifications_queue ... SELECT FROM profiles WHERE ...`
+   with NOT EXISTS guards against `notifications_log` and the queue.
+2. Schedule it via `cron.schedule(name, cron_expr, $$ select ...; $$)`.
+3. That's it. The send-push edge function handles delivery, opt-out,
+   quiet hours, and logging automatically.
+
+Likely future campaigns (deferred until we have data on what works):
+- `tier_milestone` — fires when user is X points from next tier
+- `dormancy_30d` — second-chance nudge at the 30-day mark
+- `place_opened_in_new_city` — first time a known user opens the app
+  in a city more than ~100km from their previous location
+
 ## Sending a one-off manually
 
 For announcements or testing. Two options:

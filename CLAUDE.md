@@ -243,6 +243,10 @@ Numbered sequentially in `app/src/lib/migration-*.sql`. Current set:
 - `008` — `place_type` column on `places` (and `places_staging`) so
   groceries / butchers / bakeries / cafes / sweet shops surface
   differently in the UI than restaurants
+- `009` — pre-launch `waitlist` table (insert-only via anon key) for
+  the halalnomad.travel landing page email signup
+- `010` — lifecycle notification campaigns (welcome 24h after signup,
+  dormancy_7d 7d after last_active_at) plus their pg_cron schedules
 
 **Run them manually in Supabase SQL Editor.** No migration runner yet.
 When adding a new one, keep the number sequence and document the
