@@ -42,6 +42,12 @@ asking every time:
    scope creep into social features.
 6. **Don't claim what we can't prove.** Never state a place is halal —
    only surface user-reported state with the appropriate trust level.
+7. **Not an Islamic lifestyle app.** No prayer times, no Quran, no
+   mosque finder, no iftar timer, no Ramadan mode. Those spaces are
+   saturated (Muslim Pro, etc.) and out of scope. HalalNomad is
+   exactly one thing: a halal food discovery utility for travellers.
+   Religion-adjacent features may be added later if and only if real
+   user demand surfaces — never presumed.
 
 ## Prioritised geography
 
