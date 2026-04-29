@@ -76,7 +76,7 @@ describe('addPlaceSchema', () => {
   const validPlace = {
     nameEn: 'Halal Kitchen',
     addressEn: '123 Main Street, City',
-    cuisineType: 'turkish' as const,
+    cuisineType: 'middle_eastern' as const,
     priceRange: null,
   };
 
