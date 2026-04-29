@@ -6,8 +6,13 @@ import Constants from 'expo-constants';
 import { router } from 'expo-router';
 import { supabase } from '../lib/supabase';
 import { saveUserTimezone, touchLastActive } from '../lib/notifications';
+import { track, EVENTS } from '../lib/analytics';
 
 const HEARTBEAT_MIN_INTERVAL_MS = 60 * 60 * 1000; // throttle to once per hour
+
+// Module-scoped: track grant/deny exactly once per app session
+// (the hook only mounts at root, but defensive against future refactors).
+let permissionTracked = false;
 
 Notifications.setNotificationHandler({
   handleNotification: async () => ({
@@ -24,11 +29,26 @@ async function registerForPushNotifications(): Promise<string | null> {
 
   const { status: existingStatus } = await Notifications.getPermissionsAsync();
   let finalStatus = existingStatus;
+  let didPrompt = false;
 
   if (existingStatus !== 'granted') {
     const { status } = await Notifications.requestPermissionsAsync();
     finalStatus = status;
+    didPrompt = true;
   }
+
+  // Only fire telemetry the first time we determine status this session,
+  // and only if a prompt was actually shown — otherwise we'd over-count
+  // implicit "already granted" reads.
+  if (!permissionTracked && didPrompt) {
+    track(
+      finalStatus === 'granted'
+        ? EVENTS.PERMISSION_PUSH_GRANTED
+        : EVENTS.PERMISSION_PUSH_DENIED,
+    );
+    permissionTracked = true;
+  }
+
   if (finalStatus !== 'granted') return null;
 
   const projectId = Constants.expoConfig?.extra?.eas?.projectId;

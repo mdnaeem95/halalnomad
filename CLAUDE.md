@@ -49,6 +49,21 @@ asking every time:
    Religion-adjacent features may be added later if and only if real
    user demand surfaces — never presumed.
 
+## Brand identity
+
+- **Name:** HalalNomad
+- **Domain:** halalnomad.travel (`.travel` TLD chosen because the
+  obvious `.app` and `.com` were squatted by inactive accounts)
+- **Public email:** hello@halalnomad.travel
+- **Support email:** support@halalnomad.travel (set as forwarder)
+- **Reviewer / demo account:** reviewer@halalnomad.travel (forwarder)
+- **Social handles:** @halalnomad.app on IG and TikTok,
+  halalnomad-app on Reddit. Lead with the dot-app pattern across
+  platforms; fall back to @halalnomadapp where dots aren't allowed.
+
+When updating support links in the app, use `halalnomad.travel`. The
+`.app` and `.com` TLDs we don't control — never link to them.
+
 ## Prioritised geography
 
 Year-1 focus: **non-Muslim-majority Asia**. Tokyo, Osaka, Kyoto, Seoul,

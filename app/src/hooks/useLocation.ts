@@ -1,6 +1,11 @@
 import { useEffect, useState } from 'react';
 import * as Location from 'expo-location';
 import { LatLng, Region } from '../types';
+import { track, EVENTS } from '../lib/analytics';
+
+// Module-scoped: useLocation is mounted on multiple screens, but the
+// permission state is per-app-session. Track grant/deny exactly once.
+let permissionTracked = false;
 
 const DEFAULT_LOCATION: LatLng = {
   latitude: 21.4225, // Mecca — fitting default
@@ -22,6 +27,14 @@ export function useLocation() {
   useEffect(() => {
     (async () => {
       const { status } = await Location.requestForegroundPermissionsAsync();
+      if (!permissionTracked) {
+        track(
+          status === 'granted'
+            ? EVENTS.PERMISSION_LOCATION_GRANTED
+            : EVENTS.PERMISSION_LOCATION_DENIED,
+        );
+        permissionTracked = true;
+      }
       if (status !== 'granted') {
         setErrorMsg('Location permission denied. Showing default location.');
         setIsLoading(false);

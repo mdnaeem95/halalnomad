@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   KeyboardAvoidingView,
   Platform,
@@ -17,6 +17,7 @@ import { useTheme } from '../src/hooks/useTheme';
 import { signInSchema, signUpSchema, SignInInput, SignUpInput } from '../src/lib/schemas';
 import { AppDialog } from '../src/components/AppDialog';
 import { AppColors, borderRadius, spacing, typography } from '../src/constants/theme';
+import { track, EVENTS } from '../src/lib/analytics';
 
 type Mode = 'signin' | 'signup' | 'verify';
 
@@ -28,6 +29,12 @@ export default function AuthScreen() {
   const [isLoading, setIsLoading] = useState(false);
   const [verifyEmail, setVerifyEmail] = useState('');
   const [verifyPassword, setVerifyPassword] = useState('');
+
+  useEffect(() => {
+    // Fires every time the auth modal is opened — captures all entry
+    // paths (place verify CTA, profile sign-in, add-place gate, etc.)
+    track(EVENTS.AUTH_PROMPT_SHOWN);
+  }, []);
 
   const [dialog, setDialog] = useState<{
     visible: boolean;

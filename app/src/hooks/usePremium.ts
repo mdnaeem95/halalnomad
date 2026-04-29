@@ -53,7 +53,7 @@ export function usePremium(): PremiumState {
       const info = await purchasePackage(pkg);
       if (info?.entitlements.active['HalalNomad Premium']) {
         setIsPremium(true);
-        track('subscription_purchased', {
+        track(EVENTS.SUBSCRIPTION_PURCHASED, {
           package: pkg.identifier,
           price: pkg.product.priceString,
         });
@@ -70,7 +70,7 @@ export function usePremium(): PremiumState {
       const restored = await restorePurchases();
       setIsPremium(restored);
       if (restored) {
-        track('subscription_restored');
+        track(EVENTS.SUBSCRIPTION_RESTORED);
       }
       return restored;
     } catch {

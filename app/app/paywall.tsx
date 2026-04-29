@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   ActivityIndicator,
   Linking,
@@ -15,6 +15,7 @@ import { useTranslation } from 'react-i18next';
 import { usePremium } from '../src/hooks/usePremium';
 import { useTheme } from '../src/hooks/useTheme';
 import { AppDialog, Toast } from '../src/components/AppDialog';
+import { track, EVENTS } from '../src/lib/analytics';
 import {
   borderRadius,
   shadows,
@@ -44,6 +45,10 @@ export default function PaywallScreen() {
     message: '',
   });
 
+  useEffect(() => {
+    track(EVENTS.PAYWALL_VIEWED);
+  }, []);
+
   async function handlePurchase() {
     const pkg = packages[selectedPlan];
     if (!pkg) {
@@ -56,6 +61,10 @@ export default function PaywallScreen() {
       });
       return;
     }
+    track(EVENTS.PAYWALL_PURCHASE_STARTED, {
+      package: pkg.identifier,
+      price: pkg.product.priceString,
+    });
     setIsPurchasing(true);
     try {
       const success = await purchase(pkg);

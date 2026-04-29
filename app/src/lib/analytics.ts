@@ -33,10 +33,23 @@ export const EVENTS = {
   REVIEW_ADDED: 'review_added',
   PHOTO_UPLOADED: 'photo_uploaded',
 
-  // Auth
+  // Auth — funnel
+  AUTH_PROMPT_SHOWN: 'auth_prompt_shown',
   SIGN_UP_STARTED: 'sign_up_started',
   SIGN_UP_COMPLETED: 'sign_up_completed',
   SIGN_IN_COMPLETED: 'sign_in_completed',
+
+  // Permissions — funnel
+  PERMISSION_LOCATION_GRANTED: 'permission_location_granted',
+  PERMISSION_LOCATION_DENIED: 'permission_location_denied',
+  PERMISSION_PUSH_GRANTED: 'permission_push_granted',
+  PERMISSION_PUSH_DENIED: 'permission_push_denied',
+
+  // Premium funnel
+  PAYWALL_VIEWED: 'paywall_viewed',
+  PAYWALL_PURCHASE_STARTED: 'paywall_purchase_started',
+  SUBSCRIPTION_PURCHASED: 'subscription_purchased',
+  SUBSCRIPTION_RESTORED: 'subscription_restored',
 
   // Engagement
   LANGUAGE_CHANGED: 'language_changed',
