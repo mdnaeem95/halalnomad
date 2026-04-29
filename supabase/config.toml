@@ -6,5 +6,9 @@
 project_id = "aytvorjaetitthzuijkv"
 
 [functions.send-push]
-# Use the platform JWT layer for auth — we verify the caller is the service role.
-verify_jwt = true
+# Cron-driven internal function. JWT gateway disabled because pg_cron uses
+# the new sb_secret_* keys (not JWT format). The function itself uses its
+# auto-injected SUPABASE_SERVICE_ROLE_KEY env for DB access — no privilege
+# escalation possible from the gateway. Worst case if URL leaks: someone
+# manually triggers a queue drain (notifications get sent slightly sooner).
+verify_jwt = false

@@ -83,8 +83,17 @@ brew install supabase/tap/supabase
 
 # From repo root
 supabase link --project-ref aytvorjaetitthzuijkv
-supabase functions deploy send-push
+supabase functions deploy send-push --no-verify-jwt
 ```
+
+The `--no-verify-jwt` flag is required because pg_cron uses Supabase's
+new `sb_secret_*` keys, which are not JWT format. Without it, every
+cron tick gets `401 UNAUTHORIZED_INVALID_JWT_FORMAT` from the gateway.
+The `verify_jwt = false` line in `supabase/config.toml` is meant to
+do the same thing but recent CLI versions ignore it — pass the flag
+explicitly. Security-wise this is fine: the function uses its
+auto-injected `SUPABASE_SERVICE_ROLE_KEY` for DB access, so the
+gateway-level auth is just rate-limit hygiene.
 
 No secrets to set — the function uses the auto-injected
 `SUPABASE_URL` + `SUPABASE_SERVICE_ROLE_KEY`.
@@ -93,37 +102,56 @@ No secrets to set — the function uses the auto-injected
 
 The function is idempotent and cheap — running it every 5 minutes is fine.
 
-**Option A — Supabase dashboard cron** (easiest):
-Database → Cron → New job, command:
+**Setup — store the service role key in Supabase Vault** (legacy
+`alter database` is no longer permitted on managed Supabase):
 
 ```sql
-select net.http_post(
-  url := 'https://aytvorjaetitthzuijkv.supabase.co/functions/v1/send-push',
-  headers := jsonb_build_object(
-    'Authorization', 'Bearer ' || current_setting('app.settings.service_role_key', true),
-    'Content-Type', 'application/json'
-  )
+select vault.create_secret(
+  '<SERVICE_ROLE_KEY>',
+  'service_role_key',
+  'Used by pg_cron to authenticate calls to the send-push edge function'
 );
 ```
 
-You'll need to `alter database postgres set app.settings.service_role_key = '<key>'`
-once so `current_setting` returns it.
-
-**Option B — pg_cron directly** (if you prefer SQL):
+**Schedule the job:**
 
 ```sql
-select cron.schedule('send-push', '*/5 * * * *', $$
+create extension if not exists pg_net;
+create extension if not exists pg_cron;
+
+select cron.schedule(
+  'send-push',
+  '*/5 * * * *',
+  $$
   select net.http_post(
     url := 'https://aytvorjaetitthzuijkv.supabase.co/functions/v1/send-push',
     headers := jsonb_build_object(
-      'Authorization', 'Bearer ' || current_setting('app.settings.service_role_key', true)
+      'Authorization', 'Bearer ' || (
+        select decrypted_secret from vault.decrypted_secrets
+        where name = 'service_role_key' limit 1
+      ),
+      'Content-Type', 'application/json'
     )
   );
-$$);
+  $$
+);
 ```
 
-**Option C — external cron** (e.g. GitHub Actions on a schedule):
+**Verify it's running:**
+
+```sql
+select * from cron.job_run_details
+where jobid = (select jobid from cron.job where jobname = 'send-push')
+order by start_time desc
+limit 5;
+```
+
+Look for `status = 'succeeded'` and `return_message = '1 row'`.
+
+**Alternative — external cron** (e.g. GitHub Actions on a schedule):
 just `curl -X POST` the function URL with the service-role Bearer token.
+Use this only if pg_cron / pg_net aren't available on your plan, or if
+you want centralised cron management outside Supabase.
 
 ## Adding a new notification type
 

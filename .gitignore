@@ -2,3 +2,6 @@
 
 # Private strategy notes — kept out of git intentionally
 /planning/
+
+# Supabase CLI cache
+supabase/.temp/
