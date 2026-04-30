@@ -37,7 +37,7 @@ from rich import print
 from rich.progress import Progress, SpinnerColumn, TextColumn
 from rich.table import Table
 
-from cities import DEFAULT_RADIUS_M, District, get_districts, list_cities
+from cities import DEFAULT_RADIUS_M, District, get_country, get_districts, list_cities
 from db import google_api_key, supa
 
 app = typer.Typer(add_completion=False, no_args_is_help=True)
@@ -296,6 +296,7 @@ def stage_row(
         "proposed_halal_level": 1,
         "raw": {"nearby": nr.raw, "details": details or {}},
         "city": city,
+        "country": get_country(city),
         "search_query": f'"halal" near {district.name}, {city}',
     }
 

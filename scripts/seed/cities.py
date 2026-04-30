@@ -205,6 +205,29 @@ CITIES["phuket"] = PHUKET
 CITIES["manila"] = MANILA
 
 
+# City metadata: slug → display name + country.
+#
+# Source of truth for the country auto-populated into places_staging
+# at scrape time (see google_places.stage_row). The promote_staged_place
+# RPC also keeps a parallel VALUES table for legacy rows and to resolve
+# display names — keep that in sync when adding a new city here.
+CITY_META: dict[str, dict[str, str]] = {
+    "tokyo":       {"name": "Tokyo",            "country": "Japan"},
+    "osaka":       {"name": "Osaka",            "country": "Japan"},
+    "kyoto":       {"name": "Kyoto",            "country": "Japan"},
+    "seoul":       {"name": "Seoul",            "country": "South Korea"},
+    "bangkok":     {"name": "Bangkok",          "country": "Thailand"},
+    "singapore":   {"name": "Singapore",        "country": "Singapore"},
+    "taipei":      {"name": "Taipei",           "country": "Taiwan"},
+    "hong_kong":   {"name": "Hong Kong",        "country": "Hong Kong"},
+    "ho_chi_minh": {"name": "Ho Chi Minh City", "country": "Vietnam"},
+    "hanoi":       {"name": "Hanoi",            "country": "Vietnam"},
+    "chiang_mai":  {"name": "Chiang Mai",       "country": "Thailand"},
+    "phuket":      {"name": "Phuket",           "country": "Thailand"},
+    "manila":      {"name": "Manila",           "country": "Philippines"},
+}
+
+
 def list_cities() -> list[str]:
     return sorted(CITIES.keys())
 
@@ -213,3 +236,8 @@ def get_districts(city: str) -> list[District]:
     if city not in CITIES:
         raise ValueError(f"Unknown city: {city}. Available: {list_cities()}")
     return CITIES[city]
+
+
+def get_country(city: str) -> str | None:
+    meta = CITY_META.get(city)
+    return meta["country"] if meta else None

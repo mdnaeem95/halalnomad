@@ -261,6 +261,11 @@ Numbered sequentially in `app/src/lib/migration-*.sql`. Current set:
   seeded 1,361 rows from `places_staging`, and updates the
   `promote_staged_place` RPC so future promotions carry geography
   forward. Powers the Browse view on the Explore tab
+- `013` — adds `country` to `places_staging` so the seed scraper can
+  auto-populate it at scrape time (driven by `CITY_META` in
+  `scripts/seed/cities.py`). Backfills existing staging rows. Promote
+  RPC now prefers `staging.country` and falls back to the VALUES
+  lookup only for legacy rows
 
 **Run them manually in Supabase SQL Editor.** No migration runner yet.
 When adding a new one, keep the number sequence and document the
