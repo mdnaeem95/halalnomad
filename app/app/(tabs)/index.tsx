@@ -25,6 +25,7 @@ import { PlaceCardCompact } from '../../src/components/PlaceCardCompact';
 import { MapPin } from '../../src/components/MapPin';
 import { PlaceListSkeleton } from '../../src/components/Skeleton';
 import { LoadingSplash } from '../../src/components/LoadingSplash';
+import { BrowseView } from '../../src/components/BrowseView';
 import {
   AppColors,
   borderRadius,
@@ -101,9 +102,43 @@ export default function ExploreScreen() {
     }
   }
 
-  function handleToggle(mode: 'map' | 'list') {
+  function handleToggle(mode: 'map' | 'list' | 'browse') {
     Haptics.selectionAsync();
     setViewMode(mode);
+  }
+
+  // Browse view doesn't need location — let users plan trips even
+  // before granting permission. Render the toggle + Browse directly.
+  if (viewMode === 'browse') {
+    return (
+      <View style={[styles.container, { backgroundColor: c.background }]}>
+        <View style={[styles.toggleContainer, { backgroundColor: c.divider }]}>
+          {([
+            { key: 'map' as const, label: 'Map', icon: 'map-outline' as const },
+            { key: 'list' as const, label: 'List', icon: 'list-outline' as const },
+            { key: 'browse' as const, label: 'Browse', icon: 'globe-outline' as const },
+          ]).map((item) => {
+            const isActive = viewMode === item.key;
+            return (
+              <Pressable
+                key={item.key}
+                style={[
+                  styles.toggleButton,
+                  isActive && [styles.toggleActive, { backgroundColor: c.surface }],
+                ]}
+                onPress={() => handleToggle(item.key)}
+              >
+                <Ionicons name={item.icon} size={16} color={isActive ? c.primary : c.textTertiary} />
+                <Text style={[styles.toggleText, { color: isActive ? c.primary : c.textTertiary }]}>
+                  {item.label}
+                </Text>
+              </Pressable>
+            );
+          })}
+        </View>
+        <BrowseView />
+      </View>
+    );
   }
 
   if (locationLoading) {
@@ -135,6 +170,7 @@ export default function ExploreScreen() {
         {([
           { key: 'map' as const, label: 'Map', icon: 'map-outline' as const },
           { key: 'list' as const, label: 'List', icon: 'list-outline' as const },
+          { key: 'browse' as const, label: 'Browse', icon: 'globe-outline' as const },
         ]).map((item) => {
           const isActive = viewMode === item.key;
           return (

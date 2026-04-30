@@ -93,6 +93,13 @@ function AppStack() {
           }}
         />
         <Stack.Screen
+          name="city/[city]"
+          options={{
+            title: '',
+            headerBackButtonDisplayMode: 'minimal',
+          }}
+        />
+        <Stack.Screen
           name="auth"
           options={{
             title: t('common.signIn'),

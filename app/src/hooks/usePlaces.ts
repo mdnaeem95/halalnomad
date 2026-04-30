@@ -1,8 +1,10 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import pRetry from 'p-retry';
 import {
+  fetchCountriesWithCities,
   fetchNearbyPlaces,
   fetchPlace,
+  fetchPlacesByCity,
   fetchReviews,
   fetchUserVerifications,
   searchPlaces,
@@ -30,6 +32,8 @@ export const placeKeys = {
   reviews: (placeId: string) => ['places', 'reviews', placeId] as const,
   userVerifications: (placeId: string, userId: string) =>
     ['places', 'user-verifications', placeId, userId] as const,
+  countriesWithCities: () => ['places', 'countries'] as const,
+  byCity: (city: string) => ['places', 'by-city', city] as const,
 };
 
 // ============================================
@@ -78,6 +82,30 @@ export function useReviews(placeId: string) {
   return useQuery({
     queryKey: placeKeys.reviews(placeId),
     queryFn: () => fetchReviews(placeId),
+  });
+}
+
+/**
+ * Country/city tree for the Browse view. Cached for an hour — counts
+ * change slowly, no need to refetch on every Browse open.
+ */
+export function useCountriesWithCities() {
+  return useQuery({
+    queryKey: placeKeys.countriesWithCities(),
+    queryFn: fetchCountriesWithCities,
+    staleTime: 60 * 60 * 1000, // 1 hour
+  });
+}
+
+/**
+ * Places in a single city, sorted by trust level + verifications.
+ * Powers the city detail screen at /city/[name].
+ */
+export function usePlacesByCity(city: string | undefined) {
+  return useQuery({
+    queryKey: placeKeys.byCity(city ?? ''),
+    queryFn: () => fetchPlacesByCity(city!),
+    enabled: !!city,
   });
 }
 

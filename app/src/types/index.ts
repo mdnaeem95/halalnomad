@@ -149,7 +149,37 @@ export interface Place {
   is_featured: boolean;
   featured_tier: 'highlighted' | 'promoted' | 'spotlight' | null;
   place_type: PlaceType;
+  city: string | null;
+  country: string | null;
 }
+
+// ============================================
+// Browse view — country/city aggregation
+// ============================================
+
+export interface CityCount {
+  name: string;
+  count: number;
+}
+
+export interface CountryGroup {
+  country: string;
+  total: number;
+  cities: CityCount[];
+}
+
+// Country → emoji flag mapping for the Browse view header rows.
+// Add new entries here when seeding new countries.
+export const COUNTRY_FLAGS: Record<string, string> = {
+  Japan: '🇯🇵',
+  'South Korea': '🇰🇷',
+  Thailand: '🇹🇭',
+  Singapore: '🇸🇬',
+  Taiwan: '🇹🇼',
+  'Hong Kong': '🇭🇰',
+  Vietnam: '🇻🇳',
+  Philippines: '🇵🇭',
+};
 
 export interface Review {
   id: string;

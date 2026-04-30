@@ -26,8 +26,8 @@ interface AppState {
   setMapProvider: (provider: MapProviderType) => void;
 
   // View preferences
-  exploreViewMode: 'map' | 'list';
-  setExploreViewMode: (mode: 'map' | 'list') => void;
+  exploreViewMode: 'map' | 'list' | 'browse';
+  setExploreViewMode: (mode: 'map' | 'list' | 'browse') => void;
 
   // Search
   searchQuery: string;

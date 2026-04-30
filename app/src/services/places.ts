@@ -1,6 +1,8 @@
 import { supabase } from '../lib/supabase';
 import { sanitizeText, sanitizeMultiline } from '../lib/sanitize';
 import {
+  CityCount,
+  CountryGroup,
   CuisineType,
   HalalLevel,
   LatLng,
@@ -82,6 +84,62 @@ export async function fetchPlace(id: string): Promise<Place | null> {
 
   if (error) return null;
   return data as Place;
+}
+
+/**
+ * Aggregate active places into a country → city tree with counts.
+ * Powers the Browse view on the Explore tab.
+ *
+ * Done client-side because PostgREST's .select() doesn't expose
+ * GROUP BY without an RPC, and the result set is small enough
+ * (~1.4k rows currently) that fetching just (city, country) and
+ * grouping in JS is fine. If we hit 100k places, swap for an RPC.
+ */
+export async function fetchCountriesWithCities(): Promise<CountryGroup[]> {
+  const { data, error } = await supabase
+    .from('places')
+    .select('city, country')
+    .eq('is_active', true)
+    .not('city', 'is', null)
+    .not('country', 'is', null);
+
+  if (error) throw error;
+
+  const groups = new Map<string, Map<string, number>>();
+  for (const row of (data ?? []) as Array<{ city: string; country: string }>) {
+    if (!groups.has(row.country)) groups.set(row.country, new Map());
+    const cityMap = groups.get(row.country)!;
+    cityMap.set(row.city, (cityMap.get(row.city) ?? 0) + 1);
+  }
+
+  const out: CountryGroup[] = [];
+  for (const [country, cityMap] of groups) {
+    const cities: CityCount[] = Array.from(cityMap.entries())
+      .map(([name, count]) => ({ name, count }))
+      .sort((a, b) => b.count - a.count);
+    const total = cities.reduce((sum, c) => sum + c.count, 0);
+    out.push({ country, total, cities });
+  }
+  out.sort((a, b) => b.total - a.total);
+  return out;
+}
+
+/**
+ * Fetch all active places in a given city, sorted by halal_level desc
+ * then by verification count, so the most trustworthy show first.
+ */
+export async function fetchPlacesByCity(city: string): Promise<Place[]> {
+  const { data, error } = await supabase
+    .from('places')
+    .select('*')
+    .eq('is_active', true)
+    .eq('city', city)
+    .order('halal_level', { ascending: false })
+    .order('verification_count', { ascending: false })
+    .limit(500);
+
+  if (error) throw error;
+  return (data as Place[]) ?? [];
 }
 
 /**

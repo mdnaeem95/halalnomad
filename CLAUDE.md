@@ -257,6 +257,10 @@ Numbered sequentially in `app/src/lib/migration-*.sql`. Current set:
   trigger functions from migration 006 (was breaking confirm/report
   in production because triggers couldn't write to RLS-locked
   `notifications_queue`)
+- `012` — adds `city` + `country` columns to `places`, backfills the
+  seeded 1,361 rows from `places_staging`, and updates the
+  `promote_staged_place` RPC so future promotions carry geography
+  forward. Powers the Browse view on the Explore tab
 
 **Run them manually in Supabase SQL Editor.** No migration runner yet.
 When adding a new one, keep the number sequence and document the
