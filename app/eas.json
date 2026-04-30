@@ -34,7 +34,7 @@
         "appleTeamId": "RF3P52KUZA"
       },
       "android": {
-        "serviceAccountKeyPath": "./google-services.json",
+        "serviceAccountKeyPath": "./play-service-account.json",
         "track": "internal"
       }
     }
