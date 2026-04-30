@@ -1,4 +1,4 @@
-import { Linking, Platform } from 'react-native';
+import { Linking } from 'react-native';
 import { LatLng } from '../../types';
 import { MapAddress, MapProvider, MapSearchResult } from './types';
 
@@ -27,22 +27,22 @@ export const GoogleMapsProvider: MapProvider = {
     };
   },
 
-  openDirections(from: LatLng, to: LatLng): void {
-    const url = Platform.select({
-      ios: `comgooglemaps://?saddr=${from.latitude},${from.longitude}&daddr=${to.latitude},${to.longitude}&directionsmode=transit`,
-      android: `google.navigation:q=${to.latitude},${to.longitude}`,
-      default: `https://www.google.com/maps/dir/${from.latitude},${from.longitude}/${to.latitude},${to.longitude}`,
-    });
+  openDirections(from: LatLng | null | undefined, to: LatLng): void {
+    // Use Google Maps universal HTTPS URL — works without any scheme
+    // declaration in Info.plist (LSApplicationQueriesSchemes). On iOS,
+    // if the Google Maps app is installed it auto-handles this URL;
+    // otherwise it opens in Safari → Google Maps web. Either way, the
+    // user gets directions. If `from` is provided we pass it as origin;
+    // otherwise the maps app figures it out from current location.
+    const dest = `${to.latitude},${to.longitude}`;
+    const url = from
+      ? `https://www.google.com/maps/dir/?api=1&origin=${from.latitude},${from.longitude}&destination=${dest}`
+      : `https://www.google.com/maps/dir/?api=1&destination=${dest}`;
 
-    Linking.canOpenURL(url).then((supported) => {
-      if (supported) {
-        Linking.openURL(url);
-      } else {
-        // Fallback to web URL
-        Linking.openURL(
-          `https://www.google.com/maps/dir/${from.latitude},${from.longitude}/${to.latitude},${to.longitude}`
-        );
-      }
+    Linking.openURL(url).catch(() => {
+      // Last-resort fallback (should never hit in practice — HTTPS URLs
+      // always open). Try the Apple Maps universal URL.
+      Linking.openURL(`https://maps.apple.com/?daddr=${dest}`);
     });
   },
 

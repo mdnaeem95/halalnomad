@@ -30,8 +30,9 @@ export interface MapProvider {
   /** Reverse geocode a coordinate into an address */
   reverseGeocode(location: LatLng): Promise<MapAddress>;
 
-  /** Open directions in the native map app */
-  openDirections(from: LatLng, to: LatLng): void;
+  /** Open directions in the native map app. `from` is optional —
+   *  if null/undefined, the maps app uses the user's current location. */
+  openDirections(from: LatLng | null | undefined, to: LatLng): void;
 
   /** Convert provider-specific coordinates to WGS-84 */
   toWGS84(lat: number, lng: number): LatLng;

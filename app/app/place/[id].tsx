@@ -145,7 +145,10 @@ export default function PlaceDetailScreen() {
   }
 
   function handleDirections() {
-    if (!place || !location) return;
+    if (!place) return;
+    // location may be null (user denied permission, or still loading) —
+    // pass it through anyway. The maps app will use device location as
+    // origin when our origin is missing.
     const provider = getMapProvider('google');
     provider.openDirections(location, {
       latitude: place.latitude,
