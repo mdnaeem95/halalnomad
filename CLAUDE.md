@@ -71,9 +71,21 @@ Bangkok, Singapore, Taipei first. Don't waste cycles on Kuala Lumpur,
 Jakarta, Dubai, Istanbul, etc. — saturated and our moat doesn't matter.
 See `planning/data-sourcing-strategy.md` for tier detail.
 
-**Ramadan is a forcing function.** Next marquee event: Ramadan 2027
-(2027-02-17 → 2027-03-19). Phase 2 retention features (offline maps,
-trip planning, prayer times) must be real by then.
+**Summer 2027 is the marquee event** — peak outbound travel from
+Malaysia / Indonesia / Singapore to non-Muslim Asia during school
+holidays (Jun–Aug 2027). Phase 2 retention features (offline maps,
+trip planning, advanced filters) must ship by **end of May 2027** so
+they're battle-tested before the marquee push hits.
+
+Ramadan 2027 (Feb 17 → Mar 19) is **NOT** an acquisition window —
+most observant Muslims are home with family, not travelling. Ramadan
+is a brand / editorial moment (pitch HalalTrip, CrescentRating, HHWT,
+Muslim Pro blog). Eid al-Fitr (~Mar 20) is a 1-week travel mini-spike.
+Year-end Dec 2026 – Jan 2027 is a secondary travel peak — useful as a
+dress rehearsal for summer.
+
+See `planning/business-roadmap.md` §"Calendar of Muslim travel" for
+the full seasonal map.
 
 ## Project structure
 
