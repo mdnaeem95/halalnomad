@@ -15,13 +15,14 @@ import { useAuth } from '../../src/hooks/useAuth';
 import { useLocation } from '../../src/hooks/useLocation';
 import { useTheme } from '../../src/hooks/useTheme';
 import { useCooldown } from '../../src/hooks/useCooldown';
-import { usePlace, useReviews, useUserVerifications, useVerifyPlace } from '../../src/hooks/usePlaces';
+import { useAddReview, usePlace, useReviews, useUserVerifications, useVerifyPlace } from '../../src/hooks/usePlaces';
 import { getMapProvider } from '../../src/services/map';
 import { CUISINE_LABELS, PRICE_LABELS, PLACE_TYPE_LABELS } from '../../src/types';
 import { HalalBadge } from '../../src/components/HalalBadge';
 import { FeaturedBadge } from '../../src/components/FeaturedBadge';
 import { usePremiumGuard } from '../../src/components/PremiumGate';
 import { ReportWarning } from '../../src/components/ReportWarning';
+import { ReviewModal } from '../../src/components/ReviewModal';
 import { PlaceDetailSkeleton } from '../../src/components/Skeleton';
 import { AppDialog, Toast } from '../../src/components/AppDialog';
 import {
@@ -48,8 +49,16 @@ export default function PlaceDetailScreen() {
   const styles = React.useMemo(() => createStyles(c), [c]);
   const { requirePremium } = usePremiumGuard();
   const verifyMutation = useVerifyPlace();
+  const reviewMutation = useAddReview();
   const { isOnCooldown: verifyOnCooldown, trigger: triggerVerify } = useCooldown(5000);
   const { isOnCooldown: reportOnCooldown, trigger: triggerReport } = useCooldown(5000);
+  const [reviewModalVisible, setReviewModalVisible] = useState(false);
+
+  // One review per user per place — DB-enforced via UNIQUE(place_id, user_id).
+  // Use the already-fetched review list to show the right CTA without an
+  // extra round-trip.
+  const userReview = user ? reviews.find((r) => r.user_id === user.id) : undefined;
+  const hasReviewed = !!userReview;
 
   // Dialog state
   const [dialog, setDialog] = useState<{
@@ -142,6 +151,41 @@ export default function PlaceDetailScreen() {
         { label: 'Cancel', onPress: closeDialog, style: 'cancel' },
       ],
     });
+  }
+
+  function handleOpenReview() {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    if (!user || !place) {
+      setDialog({
+        visible: true,
+        variant: 'info',
+        title: 'Sign in required',
+        message: 'Please sign in to write a review.',
+        actions: [
+          { label: 'Sign In', onPress: () => { closeDialog(); router.push('/auth'); }, style: 'primary' },
+          { label: 'Cancel', onPress: closeDialog, style: 'cancel' },
+        ],
+      });
+      return;
+    }
+    if (hasReviewed) return;
+    setReviewModalVisible(true);
+  }
+
+  function handleSubmitReview(rating: number, text: string) {
+    if (!user || !place) return;
+    reviewMutation.mutate(
+      { placeId: place.id, userId: user.id, rating, text },
+      {
+        onSuccess: () => {
+          setReviewModalVisible(false);
+          Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+          showToast('Review submitted! +20 points');
+          refreshProfile();
+        },
+        onError: () => showToast('Could not submit review — please try again', 'error'),
+      }
+    );
   }
 
   function handleDirections() {
@@ -382,9 +426,32 @@ export default function PlaceDetailScreen() {
 
         {/* Reviews */}
         <View style={styles.reviewsSection}>
-          <Text style={[styles.sectionTitle, { color: c.textPrimary }]}>
-            Reviews ({reviews.length})
-          </Text>
+          <View style={styles.reviewsHeader}>
+            <Text style={[styles.sectionTitle, { color: c.textPrimary }]}>
+              Reviews ({reviews.length})
+            </Text>
+            <Pressable
+              style={[
+                styles.writeReviewButton,
+                { borderColor: c.primaryLight },
+                hasReviewed && styles.buttonDisabled,
+              ]}
+              onPress={handleOpenReview}
+              disabled={hasReviewed}
+              accessibilityRole="button"
+              accessibilityLabel={hasReviewed ? 'You have already reviewed this place' : 'Write a review'}
+              accessibilityState={{ disabled: hasReviewed }}
+            >
+              <Ionicons
+                name={hasReviewed ? 'checkmark-circle' : 'create-outline'}
+                size={16}
+                color={c.primaryLight}
+              />
+              <Text style={[styles.writeReviewText, { color: c.primaryLight }]}>
+                {hasReviewed ? 'Reviewed' : 'Write a review'}
+              </Text>
+            </Pressable>
+          </View>
           {reviews.length === 0 ? (
             <Text style={[styles.noReviews, { color: c.textTertiary }]}>No reviews yet. Be the first!</Text>
           ) : (
@@ -402,6 +469,14 @@ export default function PlaceDetailScreen() {
           )}
         </View>
       </ScrollView>
+
+      <ReviewModal
+        visible={reviewModalVisible}
+        placeName={place.name_en}
+        onClose={() => setReviewModalVisible(false)}
+        onSubmit={handleSubmitReview}
+        isSubmitting={reviewMutation.isPending}
+      />
 
       <Toast
         visible={toast.visible}
@@ -589,10 +664,29 @@ const createStyles = (c: AppColors) => StyleSheet.create({
   reviewsSection: {
     padding: spacing.md,
   },
+  reviewsHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: spacing.sm,
+  },
   sectionTitle: {
     ...typography.h3,
     color: c.textPrimary,
-    marginBottom: spacing.sm,
+  },
+  writeReviewButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: borderRadius.md,
+    borderWidth: 1.5,
+  },
+  writeReviewText: {
+    ...typography.caption,
+    fontWeight: '600',
+    fontSize: 13,
   },
   noReviews: {
     ...typography.bodySmall,
