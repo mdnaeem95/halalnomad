@@ -253,6 +253,10 @@ Numbered sequentially in `app/src/lib/migration-*.sql`. Current set:
   the halalnomad.travel landing page email signup
 - `010` — lifecycle notification campaigns (welcome 24h after signup,
   dormancy_7d 7d after last_active_at) plus their pg_cron schedules
+- `011` — fixes a missing `SECURITY DEFINER` on the notification
+  trigger functions from migration 006 (was breaking confirm/report
+  in production because triggers couldn't write to RLS-locked
+  `notifications_queue`)
 
 **Run them manually in Supabase SQL Editor.** No migration runner yet.
 When adding a new one, keep the number sequence and document the
