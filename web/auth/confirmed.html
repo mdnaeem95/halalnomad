@@ -1,0 +1,228 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Email verified — HalalNomad</title>
+  <meta name="description" content="Email verified. Head back to the HalalNomad app to sign in." />
+  <meta name="robots" content="noindex" />
+
+  <link rel="icon" type="image/svg+xml" href="/assets/favicon.svg" />
+  <meta name="theme-color" content="#1B5E20" />
+  <link rel="stylesheet" href="/styles.css" />
+
+  <style>
+    /* Page-specific styles, layered on top of styles.css. */
+    .auth-page {
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      background: linear-gradient(160deg, var(--primary-dark) 0%, var(--primary) 70%, var(--primary-light) 100%);
+      color: #fff;
+    }
+
+    .auth-nav {
+      max-width: var(--max-w);
+      width: 100%;
+      margin: 0 auto;
+      padding: 1.25rem 1.5rem 0;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .auth-card {
+      flex: 1;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 2rem 1.5rem 4rem;
+    }
+
+    .auth-card-inner {
+      max-width: 480px;
+      width: 100%;
+      background: rgba(255, 255, 255, 0.06);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      border-radius: 16px;
+      padding: 3rem 2rem;
+      text-align: center;
+      backdrop-filter: blur(8px);
+      -webkit-backdrop-filter: blur(8px);
+    }
+
+    .auth-icon {
+      width: 80px;
+      height: 80px;
+      border-radius: 50%;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      margin: 0 auto 1.5rem;
+      background: rgba(255, 255, 255, 0.15);
+      transition: background-color 200ms ease;
+    }
+
+    .auth-icon.success {
+      background: rgba(255, 255, 255, 0.18);
+    }
+
+    .auth-icon.error {
+      background: rgba(255, 90, 90, 0.18);
+    }
+
+    .auth-icon svg {
+      width: 40px;
+      height: 40px;
+      color: #fff;
+      stroke: #fff;
+      stroke-width: 2.5;
+      fill: none;
+      stroke-linecap: round;
+      stroke-linejoin: round;
+    }
+
+    .auth-title {
+      font-size: clamp(1.6rem, 3vw, 2.2rem);
+      font-weight: 700;
+      letter-spacing: -0.02em;
+      color: #fff;
+      margin: 0 0 0.75rem;
+    }
+
+    .auth-lede {
+      font-size: 1rem;
+      line-height: 1.55;
+      color: rgba(255, 255, 255, 0.85);
+      margin: 0 0 2rem;
+    }
+
+    .auth-cta {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 0.5rem;
+      padding: 0.95rem 1.6rem;
+      background: var(--accent);
+      color: #1A1A1A;
+      border-radius: var(--radius-sm);
+      font-weight: 600;
+      font-size: 1rem;
+      text-decoration: none;
+      box-shadow: 0 4px 14px rgba(249, 168, 37, 0.4);
+      transition: transform 120ms ease, box-shadow 120ms ease;
+    }
+
+    .auth-cta:hover {
+      transform: translateY(-1px);
+      box-shadow: 0 6px 20px rgba(249, 168, 37, 0.55);
+    }
+
+    .auth-secondary {
+      display: block;
+      margin-top: 1.25rem;
+      color: rgba(255, 255, 255, 0.7);
+      font-size: 0.9rem;
+      text-decoration: underline;
+    }
+
+    .auth-fineprint {
+      margin: 1.5rem 0 0;
+      color: rgba(255, 255, 255, 0.6);
+      font-size: 0.85rem;
+      line-height: 1.55;
+    }
+
+    /* Hide error block by default; show via JS if needed */
+    .show-error .success-state { display: none; }
+    .success-state { display: block; }
+    .error-state { display: none; }
+    .show-error .error-state { display: block; }
+  </style>
+</head>
+<body class="auth-page">
+  <nav class="auth-nav">
+    <a class="brand" href="/" style="color:#fff;">
+      <span class="brand-mark" aria-hidden="true">
+        <svg viewBox="0 0 24 24" width="28" height="28" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+          <circle cx="12" cy="12" r="10"></circle>
+          <polygon points="16.24 7.76 14.12 14.12 7.76 16.24 9.88 9.88 16.24 7.76"></polygon>
+        </svg>
+      </span>
+      <span class="brand-name">HalalNomad</span>
+    </a>
+  </nav>
+
+  <main class="auth-card">
+    <div class="auth-card-inner" id="card">
+      <!-- Success state -->
+      <div class="success-state">
+        <div class="auth-icon success" aria-hidden="true">
+          <svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"></polyline></svg>
+        </div>
+        <h1 class="auth-title">Email verified.</h1>
+        <p class="auth-lede">
+          You're all set. Head back to the HalalNomad app and tap
+          <strong style="color:#fff;">"I've verified — sign me in"</strong>
+          to finish setting up your account.
+        </p>
+        <a href="halalnomad://" class="auth-cta" id="open-app-btn">
+          Open HalalNomad
+          <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"></polyline></svg>
+        </a>
+        <a href="/" class="auth-secondary">Back to halalnomad.travel</a>
+        <p class="auth-fineprint">
+          If the app didn't open, switch to it manually — your sign-in
+          will work the same way.
+        </p>
+      </div>
+
+      <!-- Error state (shown only if Supabase redirected with an error) -->
+      <div class="error-state">
+        <div class="auth-icon error" aria-hidden="true">
+          <svg viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+        </div>
+        <h1 class="auth-title">Verification failed.</h1>
+        <p class="auth-lede" id="error-message">
+          The link may have expired or been used already. Open the app and
+          try signing up again with the same email — we'll send a fresh
+          verification link.
+        </p>
+        <a href="halalnomad://" class="auth-cta">
+          Open HalalNomad
+          <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"></polyline></svg>
+        </a>
+        <a href="/" class="auth-secondary">Back to halalnomad.travel</a>
+      </div>
+    </div>
+  </main>
+
+  <script>
+    // Supabase appends auth state to the URL hash (#) on success and to
+    // query params (?error=...) on failure. Detect failure → swap state.
+    (function () {
+      const params = new URLSearchParams(window.location.search);
+      const hashParams = new URLSearchParams(window.location.hash.replace(/^#/, ''));
+      const error = params.get('error') || hashParams.get('error');
+      const errorDescription = params.get('error_description') || hashParams.get('error_description');
+
+      if (error) {
+        document.getElementById('card').classList.add('show-error');
+        if (errorDescription) {
+          document.getElementById('error-message').textContent =
+            decodeURIComponent(errorDescription.replace(/\+/g, ' '));
+        }
+      }
+
+      // Soft auto-redirect into the app after 1.5s (gives the page a
+      // moment to render so users see the confirmation, then iOS prompts
+      // to open). Skip if already in error state.
+      if (!error) {
+        setTimeout(() => {
+          window.location.href = 'halalnomad://';
+        }, 1500);
+      }
+    })();
+  </script>
+</body>
+</html>
