@@ -32,7 +32,10 @@ export const placeKeys = {
   reviews: (placeId: string) => ['places', 'reviews', placeId] as const,
   userVerifications: (placeId: string, userId: string) =>
     ['places', 'user-verifications', placeId, userId] as const,
-  countriesWithCities: () => ['places', 'countries'] as const,
+  // v2 suffix forces a fresh fetch after the pagination fix — the
+  // pre-fix aggregate (truncated at 1000 rows) was persisted to
+  // AsyncStorage with 24h TTL and would otherwise keep being served.
+  countriesWithCities: () => ['places', 'countries', 'v2'] as const,
   byCity: (city: string) => ['places', 'by-city', city] as const,
 };
 
