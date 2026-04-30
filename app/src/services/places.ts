@@ -90,23 +90,33 @@ export async function fetchPlace(id: string): Promise<Place | null> {
  * Aggregate active places into a country → city tree with counts.
  * Powers the Browse view on the Explore tab.
  *
- * Done client-side because PostgREST's .select() doesn't expose
- * GROUP BY without an RPC, and the result set is small enough
- * (~1.4k rows currently) that fetching just (city, country) and
- * grouping in JS is fine. If we hit 100k places, swap for an RPC.
+ * Paginated because PostgREST caps each .select() at 1,000 rows by
+ * default — without paging, cities late in the natural row order
+ * (e.g. Manila) get truncated and show wildly under-counted. Once
+ * the table grows past ~10k rows, swap this for an RPC that does
+ * the GROUP BY server-side.
  */
 export async function fetchCountriesWithCities(): Promise<CountryGroup[]> {
-  const { data, error } = await supabase
-    .from('places')
-    .select('city, country')
-    .eq('is_active', true)
-    .not('city', 'is', null)
-    .not('country', 'is', null);
+  const PAGE_SIZE = 1000;
+  const rows: Array<{ city: string; country: string }> = [];
 
-  if (error) throw error;
+  for (let offset = 0; ; offset += PAGE_SIZE) {
+    const { data, error } = await supabase
+      .from('places')
+      .select('city, country')
+      .eq('is_active', true)
+      .not('city', 'is', null)
+      .not('country', 'is', null)
+      .range(offset, offset + PAGE_SIZE - 1);
+
+    if (error) throw error;
+    const batch = (data ?? []) as Array<{ city: string; country: string }>;
+    rows.push(...batch);
+    if (batch.length < PAGE_SIZE) break;
+  }
 
   const groups = new Map<string, Map<string, number>>();
-  for (const row of (data ?? []) as Array<{ city: string; country: string }>) {
+  for (const row of rows) {
     if (!groups.has(row.country)) groups.set(row.country, new Map());
     const cityMap = groups.get(row.country)!;
     cityMap.set(row.city, (cityMap.get(row.city) ?? 0) + 1);
