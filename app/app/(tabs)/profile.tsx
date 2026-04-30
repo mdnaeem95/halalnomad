@@ -45,7 +45,7 @@ export default function ProfileScreen() {
         <Text style={styles.subtitle}>{t('profile.joinSubtitle')}</Text>
         <Pressable
           style={styles.primaryButton}
-          onPress={() => router.push('/auth')}
+          onPress={() => router.push('/auth?mode=signin')}
           accessibilityRole="button"
           accessibilityLabel={t('common.signIn')}
         >
@@ -53,7 +53,7 @@ export default function ProfileScreen() {
         </Pressable>
         <Pressable
           style={styles.secondaryButton}
-          onPress={() => router.push('/auth')}
+          onPress={() => router.push('/auth?mode=signup')}
           accessibilityRole="button"
           accessibilityLabel={t('common.createAccount')}
         >

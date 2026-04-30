@@ -8,7 +8,7 @@ import {
   TextInput,
   View,
 } from 'react-native';
-import { router } from 'expo-router';
+import { router, useLocalSearchParams } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useForm, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -25,7 +25,13 @@ export default function AuthScreen() {
   const { signIn, signUp } = useAuth();
   const { colors: c } = useTheme();
   const styles = React.useMemo(() => createStyles(c), [c]);
-  const [mode, setMode] = useState<Mode>('signin');
+
+  // Allow callers to land on a specific mode via ?mode=signup.
+  // Default is signin so existing entry paths (place verify CTA, etc.)
+  // keep their current behaviour.
+  const params = useLocalSearchParams<{ mode?: string }>();
+  const initialMode: Mode = params.mode === 'signup' ? 'signup' : 'signin';
+  const [mode, setMode] = useState<Mode>(initialMode);
   const [isLoading, setIsLoading] = useState(false);
   const [verifyEmail, setVerifyEmail] = useState('');
   const [verifyPassword, setVerifyPassword] = useState('');

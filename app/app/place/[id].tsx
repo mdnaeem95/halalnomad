@@ -31,6 +31,7 @@ import {
   spacing,
   typography,
 } from '../../src/constants/theme';
+import { FEATURES } from '../../src/constants/features';
 
 export default function PlaceDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -295,23 +296,27 @@ export default function PlaceDetailScreen() {
             <Text style={styles.primaryButtonText}>Get Directions</Text>
           </Pressable>
 
-          <Pressable
-            style={[styles.saveButton, { backgroundColor: c.surface, borderColor: c.accent }]}
-            onPress={() => {
-              if (requirePremium()) {
-                Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-                showToast('Saved to list! (coming soon)', 'info');
-              }
-            }}
-            accessibilityRole="button"
-            accessibilityLabel="Save to trip list. Premium feature."
-          >
-            <Ionicons name="bookmark-outline" size={18} color={c.accent} />
-            <Text style={[styles.saveButtonText, { color: c.accent }]}>Save to List</Text>
-            <View style={[styles.premiumBadge, { backgroundColor: c.accent }]}>
-              <Text style={styles.premiumBadgeText}>PRO</Text>
-            </View>
-          </Pressable>
+          {/* Save to List — Premium-gated. Hidden until Phase 2 features
+              ship and Premium is re-enabled. See src/constants/features.ts. */}
+          {FEATURES.premiumEnabled && (
+            <Pressable
+              style={[styles.saveButton, { backgroundColor: c.surface, borderColor: c.accent }]}
+              onPress={() => {
+                if (requirePremium()) {
+                  Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+                  showToast('Saved to list! (coming soon)', 'info');
+                }
+              }}
+              accessibilityRole="button"
+              accessibilityLabel="Save to trip list. Premium feature."
+            >
+              <Ionicons name="bookmark-outline" size={18} color={c.accent} />
+              <Text style={[styles.saveButtonText, { color: c.accent }]}>Save to List</Text>
+              <View style={[styles.premiumBadge, { backgroundColor: c.accent }]}>
+                <Text style={styles.premiumBadgeText}>PRO</Text>
+              </View>
+            </Pressable>
+          )}
 
           <Pressable
             style={[
