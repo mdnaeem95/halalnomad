@@ -1,0 +1,104 @@
+<!--
+  HalalNomad — sign-up confirmation email template.
+
+  Paste into Supabase Dashboard → Authentication → Email Templates →
+  "Confirm signup" → HTML body. Subject line: "Verify your HalalNomad email".
+
+  Variables available (Supabase substitutes these at send time):
+    {{ .ConfirmationURL }} — the link the user clicks to verify
+    {{ .Email }}            — recipient email
+    {{ .Token }}            — raw token (alternative if you want a code instead of URL)
+    {{ .SiteURL }}          — configured Site URL
+
+  Email-client compatibility:
+    - Tables for layout (Outlook + Gmail still need this)
+    - Inline CSS only (most clients strip <style>)
+    - No web fonts (system stack)
+    - No background images
+    - Max width 480px so it renders cleanly on mobile and desktop
+
+  Tested: iOS Mail, Gmail web, Gmail mobile, Outlook web. Looks good.
+-->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="x-apple-disable-message-reformatting">
+  <title>Verify your HalalNomad email</title>
+</head>
+<body style="margin:0;padding:0;background-color:#FAFAFA;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;color:#1A1A1A;">
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background-color:#FAFAFA;">
+    <tr>
+      <td align="center" style="padding:40px 16px;">
+        <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="max-width:480px;background-color:#FFFFFF;border-radius:14px;overflow:hidden;box-shadow:0 2px 12px rgba(0,0,0,0.06);">
+
+          <!-- Hero -->
+          <tr>
+            <td style="padding:40px 32px 28px;text-align:center;background:#1B5E20;background-image:linear-gradient(135deg,#0D3B13 0%,#1B5E20 60%,#388E3C 100%);">
+              <table role="presentation" cellpadding="0" cellspacing="0" border="0" style="margin:0 auto 14px;">
+                <tr>
+                  <td width="56" height="56" align="center" valign="middle" style="width:56px;height:56px;background-color:rgba(255,255,255,0.18);border-radius:28px;color:#FFFFFF;font-size:30px;line-height:56px;font-weight:600;">
+                    ◇
+                  </td>
+                </tr>
+              </table>
+              <h1 style="margin:0;color:#FFFFFF;font-size:22px;font-weight:700;letter-spacing:-0.5px;">HalalNomad</h1>
+            </td>
+          </tr>
+
+          <!-- Body -->
+          <tr>
+            <td style="padding:40px 32px 24px;">
+              <h2 style="margin:0 0 14px;color:#1A1A1A;font-size:24px;font-weight:700;letter-spacing:-0.3px;line-height:1.3;">Confirm your email</h2>
+              <p style="margin:0 0 28px;color:#555555;font-size:15px;line-height:1.55;">
+                Welcome to HalalNomad. Tap the button below to verify your email and start contributing — verify Halal places, earn points, help fellow travellers.
+              </p>
+
+              <!-- Button -->
+              <table role="presentation" cellpadding="0" cellspacing="0" border="0" style="margin:0 0 28px;">
+                <tr>
+                  <td bgcolor="#1B5E20" style="background-color:#1B5E20;border-radius:8px;">
+                    <a href="{{ .ConfirmationURL }}" style="display:inline-block;padding:14px 28px;color:#FFFFFF;font-size:15px;font-weight:600;text-decoration:none;border-radius:8px;">
+                      Verify email
+                    </a>
+                  </td>
+                </tr>
+              </table>
+
+              <p style="margin:0 0 8px;color:#757575;font-size:13px;line-height:1.5;">
+                Or copy and paste this link into your browser:
+              </p>
+              <p style="margin:0 0 24px;word-break:break-all;">
+                <a href="{{ .ConfirmationURL }}" style="color:#1B5E20;font-size:13px;text-decoration:underline;">{{ .ConfirmationURL }}</a>
+              </p>
+
+              <p style="margin:0;padding-top:20px;border-top:1px solid #E0E0E0;color:#757575;font-size:13px;line-height:1.55;">
+                If you didn't sign up for HalalNomad, you can safely ignore this email — no account will be created.
+              </p>
+            </td>
+          </tr>
+
+          <!-- Footer -->
+          <tr>
+            <td style="padding:20px 32px 32px;text-align:center;border-top:1px solid #F0F0F0;">
+              <p style="margin:0 0 4px;color:#757575;font-size:12px;line-height:1.5;">
+                Halal food, anywhere you travel.
+              </p>
+              <p style="margin:0;color:#999999;font-size:12px;">
+                <a href="https://halalnomad.travel" style="color:#1B5E20;text-decoration:none;">halalnomad.travel</a>
+              </p>
+            </td>
+          </tr>
+        </table>
+
+        <!-- Outside-card legal-ish footer -->
+        <p style="margin:16px 0 0;color:#9E9E9E;font-size:11px;line-height:1.5;text-align:center;">
+          You're receiving this because you signed up at halalnomad.travel.<br>
+          This is an automated message — replies aren't monitored.
+        </p>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>
