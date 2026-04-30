@@ -123,7 +123,13 @@ Operational summary:
 - **Maps:** react-native-maps with a provider abstraction (Google default,
   AMap/Baidu/Yandex stubs in `services/map/`)
 - **IAP:** RevenueCat (`src/lib/revenue-cat.ts`) — init at app launch,
-  login/logout wired into auth state changes
+  login/logout wired into auth state changes. **Currently disabled at
+  v1 launch** via `FEATURES.premiumEnabled` (see
+  `src/constants/features.ts`) because Phase 2 features promised in
+  the original paywall (offline maps, trip planning, advanced
+  filters) aren't built yet — Apple rejected the sub metadata for
+  exactly this reason. UI is gated; SDK still initialises so the
+  re-enable is a single flag flip.
 - **Push:** expo-notifications — token registered on sign-in, AppState
   heartbeat for `last_active_at`, deep-link handler routes `placeId` →
   `/place/:id` and `screen` → any expo-router path

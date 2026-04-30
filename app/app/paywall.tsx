@@ -16,6 +16,7 @@ import { usePremium } from '../src/hooks/usePremium';
 import { useTheme } from '../src/hooks/useTheme';
 import { AppDialog, Toast } from '../src/components/AppDialog';
 import { track, EVENTS } from '../src/lib/analytics';
+import { FEATURES } from '../src/constants/features';
 import {
   borderRadius,
   shadows,
@@ -45,9 +46,20 @@ export default function PaywallScreen() {
     message: '',
   });
 
+  // Defense-in-depth: if anything navigates here while the premium
+  // feature is disabled, bounce back. The Profile entry is already
+  // gated; this catches deep-links / future regressions.
   useEffect(() => {
+    if (!FEATURES.premiumEnabled) {
+      router.back();
+      return;
+    }
     track(EVENTS.PAYWALL_VIEWED);
   }, []);
+
+  if (!FEATURES.premiumEnabled) {
+    return null;
+  }
 
   async function handlePurchase() {
     const pkg = packages[selectedPlan];

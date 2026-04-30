@@ -11,6 +11,7 @@ import { useAppStore } from '../../src/stores/app-store';
 import { TierBadge } from '../../src/components/TierBadge';
 import { TIER_THRESHOLDS, ContributorTier } from '../../src/types';
 import { AppColors, ColorScheme } from '../../src/constants/theme';
+import { FEATURES } from '../../src/constants/features';
 import { SUPPORTED_LANGUAGES, SupportedLanguage } from '../../src/i18n';
 import {
   borderRadius,
@@ -159,8 +160,11 @@ export default function ProfileScreen() {
         </View>
       </View>
 
-      {/* Premium upsell */}
-      {!isPremium && (
+      {/* Premium upsell — gated behind FEATURES.premiumEnabled.
+          Disabled at v1 launch since Phase 2 features (offline maps,
+          advanced filters, trip planning) aren't built yet. See
+          src/constants/features.ts. */}
+      {FEATURES.premiumEnabled && !isPremium && (
         <Pressable
           style={styles.premiumCard}
           onPress={() => router.push('/paywall')}
@@ -179,7 +183,7 @@ export default function ProfileScreen() {
           <Ionicons name="chevron-forward" size={20} color={c.textTertiary} />
         </Pressable>
       )}
-      {isPremium && (
+      {FEATURES.premiumEnabled && isPremium && (
         <View style={styles.premiumActiveCard}>
           <Ionicons name="star" size={20} color={c.accent} />
           <Text style={styles.premiumActiveText}>Premium Active</Text>
