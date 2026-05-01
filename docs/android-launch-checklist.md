@@ -119,21 +119,21 @@ listing copy.
       free or paid = Free.
 - [x] **Confirm declarations** (the 4 mandatory checkboxes about
       developer policies, US export laws, etc).
-- [ ] **App access** — set to "All functionality available without
+- [x] **App access** — set to "All functionality available without
       special access" since the app works without a paid login. If
       sign-in is required for any flow, provide the reviewer
       contact email `hello@halalnomad.travel` (single email per
       CLAUDE.md).
-- [ ] **Ads** → "No, my app does not contain ads." (Hard rule per
+- [x] **Ads** → "No, my app does not contain ads." (Hard rule per
       CLAUDE.md.)
-- [ ] **Content rating** — fill out the IARC questionnaire. We're a
+- [x] **Content rating** — fill out the IARC questionnaire. We're a
       utility app with no violence/sex/gambling/etc. Should land at
       "Everyone."
-- [ ] **Target audience** → 18+ (consistent with App Store rating).
+- [x] **Target audience** → 18+ (consistent with App Store rating).
       Or 13+ if we want broader reach — check what we set for iOS.
-- [ ] **News app declaration** → No.
-- [ ] **COVID-19 contact-tracing declaration** → No.
-- [ ] **Government app declaration** → No.
+- [x] **News app declaration** → No.
+- [x] **COVID-19 contact-tracing declaration** → No.
+- [x] **Government app declaration** → No.
 
 ---
 
@@ -142,7 +142,7 @@ listing copy.
 Equivalent to App Store privacy nutrition labels but more granular.
 Allow ~30 min. Be specific — wrong answers trigger a re-review.
 
-- [ ] **Data collected from users:**
+- [x] **Data collected from users:**
       - Email address (for auth) — required, not shared, encrypted in
         transit, user can request deletion
       - Approximate location — required for nearby places, not shared,
@@ -150,15 +150,15 @@ Allow ~30 min. Be specific — wrong answers trigger a re-review.
       - Precise location — optional, only when user grants permission
       - Photos — uploaded by user when adding a place / reviewing
       - User ID — Supabase user UUID, internal only
-- [ ] **Data collected automatically:**
+- [x] **Data collected automatically:**
       - Crash logs (Sentry) — required for app functionality, not
         shared, anonymised
       - Diagnostics / app activity (PostHog) — optional, used for
         analytics
-- [ ] **Data sharing with third parties:** None for marketing. Service
+- [x] **Data sharing with third parties:** None for marketing. Service
       providers (Supabase / Sentry / PostHog / RevenueCat — list each
       with their privacy policy URL).
-- [ ] **Data deletion** — declare that users can delete their account
+- [x] **Data deletion** — declare that users can delete their account
       via the in-app Settings flow. Verify this actually works on
       Android before declaring.
 
@@ -190,20 +190,20 @@ The marketing surface. ~2 hours design time.
       "iPhone", "iCloud") — replace with "Google Play" / "your phone"
       / generic. Apple cares about this; Google doesn't, but
       symmetry helps maintainability.
-- [ ] **Category** → Travel & Local (primary) or Food & Drink
+- [x] **Category** → Travel & Local (primary) or Food & Drink
       (alternative — A/B mentally and pick one).
-- [ ] **Tags** — pick from the predefined list. Suggest:
+- [x] **Tags** — pick from the predefined list. Suggest:
       Halal, Muslim travel, Restaurant finder, Food discovery, Travel
       guide.
-- [ ] **Privacy policy URL** — `https://mdnaeem95.github.io/halalnomad/privacy`
+- [x] **Privacy policy URL** — `https://mdnaeem95.github.io/halalnomad/privacy`
       (matches what was submitted to Apple). Migrate to
       halalnomad.travel/privacy as a follow-up; not blocking.
-- [ ] **Account deletion URL** — `https://halalnomad.travel/account-deletion`.
+- [x] **Account deletion URL** — `https://halalnomad.travel/account-deletion`.
       The page explains the email-based request flow and what gets
       deleted. Required by Play Store for any app with sign-up.
-- [ ] **Support email** — `hello@halalnomad.travel` (single email
+- [x] **Support email** — `hello@halalnomad.travel` (single email
       per CLAUDE.md — there is no separate support@).
-- [ ] **Website** — `https://halalnomad.travel`.
+- [x] **Website** — `https://halalnomad.travel`.
 
 ---
 
