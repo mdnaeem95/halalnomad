@@ -86,7 +86,7 @@ One-time setup, ~1 hour total.
 Get a working APK on your own Android device before bothering with
 listing copy.
 
-- [ ] **Run development build for testing.**
+- [x] **Run development build for testing.**
       `cd app && eas build --profile development --platform android`
       Install on a personal Android device (sideload). Verify:
       - App opens, splash → onboarding renders

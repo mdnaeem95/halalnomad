@@ -33,6 +33,7 @@
       },
       "edgeToEdgeEnabled": true,
       "package": "com.halalnomad.app",
+      "googleServicesFile": "./google-services.json",
       "config": {
         "googleMaps": {
           "apiKey": "AIzaSyDytPqAN0RbRt3_jytvLLdIiODyN8dJXCM"
@@ -48,6 +49,15 @@
       "expo-router",
       "expo-location",
       "expo-image-picker",
+      [
+        "expo-splash-screen",
+        {
+          "backgroundColor": "#1B5E20",
+          "image": "./assets/splash-icon.png",
+          "imageWidth": 200,
+          "resizeMode": "contain"
+        }
+      ],
       [
         "@sentry/react-native/expo",
         {

@@ -43,9 +43,17 @@ export async function loginRevenueCat(userId: string) {
 
 /**
  * Reset RevenueCat identity on sign out.
+ *
+ * Skips the call when RC is still on its anonymous ID — calling logOut
+ * on an anonymous user logs a (harmless) warning and is wasteful since
+ * RC is already in the unidentified state we want.
  */
 export async function logoutRevenueCat() {
   try {
+    const userId = await Purchases.getAppUserID();
+    if (userId.startsWith('$RCAnonymousID:')) {
+      return;
+    }
     await Purchases.logOut();
   } catch (e) {
     console.warn('RevenueCat logout failed:', e);
