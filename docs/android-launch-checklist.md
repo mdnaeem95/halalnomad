@@ -103,7 +103,7 @@ listing copy.
       - Confirm Halal works (writes to Supabase)
       - Push notification arrives (test with a Confirm Halal action
         from another account)
-- [ ] **Run production build.**
+- [x] **Run production build.**
       `cd app && eas build --profile production --platform android`
       Produces an `.aab` (Android App Bundle) — the format Play Store
       requires. This is what gets uploaded.
@@ -114,15 +114,16 @@ listing copy.
 
 ~30 minutes.
 
-- [ ] **Create app** in Play Console → "Create app" → name
+- [x] **Create app** in Play Console → "Create app" → name
       "HalalNomad", default language English (US), app or game = App,
       free or paid = Free.
-- [ ] **Confirm declarations** (the 4 mandatory checkboxes about
+- [x] **Confirm declarations** (the 4 mandatory checkboxes about
       developer policies, US export laws, etc).
 - [ ] **App access** — set to "All functionality available without
       special access" since the app works without a paid login. If
       sign-in is required for any flow, provide the reviewer
-      account: `reviewer@halalnomad.travel` (per CLAUDE.md).
+      contact email `hello@halalnomad.travel` (single email per
+      CLAUDE.md).
 - [ ] **Ads** → "No, my app does not contain ads." (Hard rule per
       CLAUDE.md.)
 - [ ] **Content rating** — fill out the IARC questionnaire. We're a
@@ -194,9 +195,14 @@ The marketing surface. ~2 hours design time.
 - [ ] **Tags** — pick from the predefined list. Suggest:
       Halal, Muslim travel, Restaurant finder, Food discovery, Travel
       guide.
-- [ ] **Privacy policy URL** — `https://halalnomad.travel/privacy`
-      (verify this exists; create if not — copy from iOS submission).
-- [ ] **Support email** — `support@halalnomad.travel` per CLAUDE.md.
+- [ ] **Privacy policy URL** — `https://mdnaeem95.github.io/halalnomad/privacy`
+      (matches what was submitted to Apple). Migrate to
+      halalnomad.travel/privacy as a follow-up; not blocking.
+- [ ] **Account deletion URL** — `https://halalnomad.travel/account-deletion`.
+      The page explains the email-based request flow and what gets
+      deleted. Required by Play Store for any app with sign-up.
+- [ ] **Support email** — `hello@halalnomad.travel` (single email
+      per CLAUDE.md — there is no separate support@).
 - [ ] **Website** — `https://halalnomad.travel`.
 
 ---
@@ -211,7 +217,7 @@ can promote to production. This is the calendar bottleneck.
       Closed testing → "Create new track" → name it "Beta".
 - [ ] **Upload the .aab** built in Phase 2 to the Beta track.
       Release name: `1.0.0 (1)`. Release notes: "First Android beta —
-      please report any issues to support@halalnomad.travel."
+      please report any issues to hello@halalnomad.travel."
 - [ ] **Create tester list** of 12+ Gmail-account holders. Recruit:
       - 5 from your "first 50" personal network
       - 5 from the halalnomad.travel waitlist (filter for Android

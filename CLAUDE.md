@@ -54,9 +54,11 @@ asking every time:
 - **Name:** HalalNomad
 - **Domain:** halalnomad.travel (`.travel` TLD chosen because the
   obvious `.app` and `.com` were squatted by inactive accounts)
-- **Public email:** hello@halalnomad.travel
-- **Support email:** support@halalnomad.travel (set as forwarder)
-- **Reviewer / demo account:** reviewer@halalnomad.travel (forwarder)
+- **Email (single, used for all purposes):** hello@halalnomad.travel
+  — Public contact, support, App Store / Play Store reviewer
+  contact, account deletion requests, GDPR enquiries. There is
+  intentionally only one professional email; don't invent
+  support@ / reviewer@ / press@ — they don't exist.
 - **Social handles:** @halalnomad.app on IG and TikTok,
   halalnomad-app on Reddit. Lead with the dot-app pattern across
   platforms; fall back to @halalnomadapp where dots aren't allowed.

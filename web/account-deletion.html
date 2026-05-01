@@ -1,0 +1,197 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Delete your account — HalalNomad</title>
+  <meta name="description" content="Request deletion of your HalalNomad account and associated data." />
+  <meta name="robots" content="noindex" />
+
+  <link rel="icon" type="image/svg+xml" href="/assets/favicon.svg" />
+  <link rel="apple-touch-icon" href="/assets/apple-touch-icon.png" />
+  <meta name="theme-color" content="#1B5E20" />
+  <link rel="stylesheet" href="/styles.css" />
+
+  <style>
+    /* Page-specific styles. Keep aligned with auth/confirmed.html — same
+       restrained palette, same typography, no surprises. */
+    .page {
+      max-width: 720px;
+      margin: 0 auto;
+      padding: 2.5rem 1.5rem 4rem;
+    }
+
+    .page h1 {
+      font-size: clamp(1.8rem, 4vw, 2.4rem);
+      letter-spacing: -0.02em;
+      margin: 0 0 0.5rem;
+    }
+
+    .page .lede {
+      font-size: 1.05rem;
+      line-height: 1.6;
+      color: var(--ink-700, #3D3D3D);
+      margin: 0 0 2rem;
+    }
+
+    .page h2 {
+      font-size: 1.15rem;
+      letter-spacing: -0.01em;
+      margin: 2rem 0 0.75rem;
+    }
+
+    .page ul {
+      padding-left: 1.25rem;
+      line-height: 1.6;
+      color: var(--ink-700, #3D3D3D);
+    }
+
+    .page li { margin-bottom: 0.4rem; }
+
+    .page p {
+      line-height: 1.6;
+      color: var(--ink-700, #3D3D3D);
+    }
+
+    .cta-card {
+      background: var(--cream, #F4EFE6);
+      border-radius: var(--radius-md, 12px);
+      padding: 1.5rem 1.5rem 1.75rem;
+      margin: 2rem 0 0;
+      text-align: center;
+    }
+
+    .cta-card .cta-btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 0.5rem;
+      padding: 0.95rem 1.6rem;
+      background: var(--primary, #1B5E20);
+      color: #fff;
+      border-radius: var(--radius-sm, 8px);
+      font-weight: 600;
+      font-size: 1rem;
+      text-decoration: none;
+      transition: transform 120ms ease;
+    }
+
+    .cta-card .cta-btn:hover {
+      transform: translateY(-1px);
+    }
+
+    .cta-note {
+      margin-top: 0.75rem;
+      font-size: 0.85rem;
+      color: var(--ink-500, #7A7A7A);
+    }
+
+    .nav {
+      max-width: var(--max-w);
+      width: 100%;
+      margin: 0 auto;
+      padding: 1.25rem 1.5rem 0;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+  </style>
+</head>
+<body>
+  <nav class="nav">
+    <a class="brand" href="/">
+      <span class="brand-mark" aria-hidden="true">
+        <svg viewBox="0 0 24 24" width="28" height="28" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+          <circle cx="12" cy="12" r="10"></circle>
+          <polygon points="16.24 7.76 14.12 14.12 7.76 16.24 9.88 9.88 16.24 7.76"></polygon>
+        </svg>
+      </span>
+      <span class="brand-name">HalalNomad</span>
+    </a>
+  </nav>
+
+  <main class="page">
+    <h1>Delete your account</h1>
+    <p class="lede">
+      You can request deletion of your HalalNomad account and all
+      associated data at any time. We'll process the request within
+      30 days.
+    </p>
+
+    <div class="cta-card">
+      <a
+        class="cta-btn"
+        href="mailto:hello@halalnomad.travel?subject=Delete%20my%20account&body=Hi%20HalalNomad%20team%2C%0A%0APlease%20delete%20my%20account%20and%20all%20associated%20data.%0A%0AAccount%20email%3A%20%5Byour%20email%5D%0A%0AThanks."
+      >
+        Email us to request deletion
+      </a>
+      <p class="cta-note">
+        Email <strong>hello@halalnomad.travel</strong> from the address
+        tied to your account so we can verify it's really you.
+      </p>
+    </div>
+
+    <h2>What gets deleted</h2>
+    <ul>
+      <li>Your profile (display name, avatar, points, tier)</li>
+      <li>Photos you've uploaded for places</li>
+      <li>Reviews you've written</li>
+      <li>Verifications and reports you've submitted</li>
+      <li>Your push notification token and notification history</li>
+      <li>Your authentication record (email + password)</li>
+    </ul>
+
+    <h2>What we may retain</h2>
+    <p>
+      For audit and platform-integrity reasons, we retain a small amount
+      of anonymised data after deletion:
+    </p>
+    <ul>
+      <li>
+        <strong>Aggregate place data</strong> — places you originally
+        added stay live for other users, but the link back to your
+        identity is removed.
+      </li>
+      <li>
+        <strong>Anonymised analytics events</strong> — already
+        de-identified before deletion; cannot be traced back to you.
+      </li>
+    </ul>
+    <p>
+      We never retain personally identifiable information after a
+      deletion request is honoured.
+    </p>
+
+    <h2>Timeline</h2>
+    <p>
+      Most requests are processed within 7 days. The 30-day window is a
+      hard cap (per GDPR Article 17), and we'll only ever take that
+      long if the deletion request is contested or unclear.
+    </p>
+
+    <h2>Questions</h2>
+    <p>
+      Email <strong>hello@halalnomad.travel</strong> — happy to walk
+      you through what will and won't be deleted before you commit.
+    </p>
+  </main>
+
+  <footer>
+    <div class="footer-row">
+      <div>
+        <span class="brand-name">HalalNomad</span>
+        <p class="footer-tagline">Find Halal food, anywhere you travel.</p>
+      </div>
+      <div class="footer-links">
+        <a href="/">Home</a>
+        <a href="https://mdnaeem95.github.io/halalnomad/privacy">Privacy</a>
+      </div>
+    </div>
+    <p class="footer-copy">© <span id="year"></span> HalalNomad.</p>
+  </footer>
+
+  <script>
+    document.getElementById('year').textContent = new Date().getFullYear();
+  </script>
+</body>
+</html>
