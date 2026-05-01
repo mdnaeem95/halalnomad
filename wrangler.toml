@@ -1,0 +1,19 @@
+# Cloudflare Workers config for halalnomad.travel.
+#
+# This is an assets-only Worker — no server JS, just static files served
+# from the web/ folder. Cloudflare's "Workers Static Assets" feature is
+# what powers this; see https://developers.cloudflare.com/workers/static-assets/
+#
+# Deploy is triggered automatically on pushes to main once the Cloudflare
+# project is connected to the GitHub repo (see Pages/Workers settings →
+# Build configuration → Source).
+
+name = "halalnomad"
+compatibility_date = "2024-12-01"
+
+[assets]
+directory = "./web"
+# Serve the actual file when a path matches a file. For unknown paths,
+# return Cloudflare's default 404 — we don't need SPA fallback or a
+# custom 404 page for a multi-page static site.
+not_found_handling = "none"
