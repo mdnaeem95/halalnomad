@@ -218,8 +218,8 @@ export default function ExploreScreen() {
                   latitude: place.latitude,
                   longitude: place.longitude,
                 }}
+                anchor={{ x: 0.5, y: 1 }}
                 onPress={() => handleMarkerPress(place)}
-                tracksViewChanges={false}
               >
                 <MapPin
                   halalLevel={place.halal_level}

@@ -25,6 +25,10 @@ export function MapPin({ halalLevel, isFeatured = false }: Props) {
 
   return (
     <View style={styles.container}>
+      {/* Pin tail — rendered first so the head sits on top of it.
+          Using a rotated square (diamond) instead of the CSS-triangle
+          border trick because the latter renders unreliably on Android. */}
+      <View style={[styles.pinTail, { backgroundColor: pinColor }]} />
       {/* Pin head */}
       <View style={[styles.pinHead, { backgroundColor: pinColor }]}>
         {isFeatured ? (
@@ -33,8 +37,6 @@ export function MapPin({ halalLevel, isFeatured = false }: Props) {
           <Ionicons name="restaurant" size={14} color={colors.white} />
         )}
       </View>
-      {/* Pin tail */}
-      <View style={[styles.pinTail, { borderTopColor: pinColor }]} />
     </View>
   );
 }
@@ -43,7 +45,7 @@ const styles = StyleSheet.create({
   container: {
     alignItems: 'center',
     width: 36,
-    height: 44,
+    height: 40,
   },
   pinHead: {
     width: 32,
@@ -58,15 +60,14 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.25,
     shadowRadius: 4,
     elevation: 4,
+    position: 'absolute',
+    top: 0,
   },
   pinTail: {
-    width: 0,
-    height: 0,
-    borderLeftWidth: 6,
-    borderRightWidth: 6,
-    borderTopWidth: 8,
-    borderLeftColor: 'transparent',
-    borderRightColor: 'transparent',
-    marginTop: -2,
+    width: 12,
+    height: 12,
+    transform: [{ rotate: '45deg' }],
+    position: 'absolute',
+    bottom: 4,
   },
 });
