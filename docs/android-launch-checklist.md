@@ -18,19 +18,19 @@ by the closed-testing clock. Active work is ~3 days.
 These are small but should land before EAS Build runs to avoid
 re-builds.
 
-- [ ] **Dedupe Android permissions in [app.json](../app/app.json).**
+- [x] **Dedupe Android permissions in [app.json](../app/app.json).**
       Currently each of `ACCESS_FINE_LOCATION`, `ACCESS_COARSE_LOCATION`,
       `CAMERA`, `RECORD_AUDIO` is listed twice. Clean to one each.
       Drop `RECORD_AUDIO` entirely unless we actually need mic access
       (we don't — kept by accident from a template).
-- [ ] **Fix [eas.json](../app/eas.json) submit config.**
+- [x] **Fix [eas.json](../app/eas.json) submit config.**
       The current `serviceAccountKeyPath: "./google-services.json"` is
       wrong. `google-services.json` is the FCM client config (used at
       build time, baked into the APK). The submit step needs a Google
       Cloud **service account JSON** (different file, used at submit
       time to authenticate to the Play Developer API). Rename to
       `play-service-account.json` and add it to `.gitignore`.
-- [ ] **Restrict the Google Maps API key per-platform.** The same key
+- [x] **Restrict the Google Maps API key per-platform.** The same key
       `AIzaSyDytPqAN0RbRt3_jytvLLdIiODyN8dJXCM` is used for iOS and
       Android in app.json. Either restrict the existing key to allow
       both `com.halalnomad.app` (Android package + SHA-1) and the iOS
@@ -75,9 +75,16 @@ One-time setup, ~1 hour total.
          `halalnomad-play-submit@<project>.iam.gserviceaccount.com`)
          → grant "Admin (all permissions)" or scoped "Release
          manager" for HalalNomad → invite
-- [x] **Both credential files gitignored** — landed in commit
-      `9ead605`. Verify they don't show up in `git status` before
-      staging anything else.
+- [x] **Credentials handled correctly:**
+      - `play-service-account.json` — gitignored. Real secret;
+        authenticates to Play Developer API. EAS Submit uploads it
+        directly from your local machine, so it never needs to live
+        in the repo.
+      - `google-services.json` — **committed**. It's an FCM client
+        config, not a secret (the API key inside is restricted
+        server-side by package name + SHA-1). EAS Build needs it in
+        the repo to wire FCM into the Android build. Following
+        Firebase's own guidance.
 
 ---
 

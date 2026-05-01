@@ -34,9 +34,14 @@ yarn-error.*
 .env
 .env*.local
 
-# Android credentials — contain secrets, never commit
-google-services.json
+# Play Developer API service account — authenticates to Google Play
+# from `eas submit`. Real secret. Never commit.
 play-service-account.json
+
+# Note: google-services.json is intentionally NOT gitignored.
+# It's an FCM client config, not a secret — the API key inside is
+# restricted server-side by package name + SHA-1, so it's safe to
+# commit (and required to be in the repo so EAS Build can find it).
 
 # typescript
 *.tsbuildinfo
