@@ -17,6 +17,7 @@ import { useAppStore } from '../../src/stores/app-store';
 import { CuisineType, CUISINE_LABELS, Place } from '../../src/types';
 import { PlaceCard } from '../../src/components/PlaceCard';
 import { PremiumLockBanner } from '../../src/components/PremiumGate';
+import { FEATURES } from '../../src/constants/features';
 import { PlaceListSkeleton } from '../../src/components/Skeleton';
 import {
   AppColors,
@@ -120,8 +121,9 @@ export default function SearchScreen() {
         ))}
       </ScrollView>
 
-      {/* Premium filters upsell */}
-      {!isPremium && (
+      {/* Premium filters upsell — hidden until Phase 2 features
+          ship and Premium is re-enabled. See src/constants/features.ts. */}
+      {FEATURES.premiumEnabled && !isPremium && (
         <View style={{ paddingHorizontal: spacing.sm, paddingBottom: spacing.sm }}>
           <PremiumLockBanner message="Advanced Filters — zabihah-only, no-alcohol, dietary preferences" />
         </View>
