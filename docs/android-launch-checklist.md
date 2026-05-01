@@ -45,26 +45,39 @@ re-builds.
 
 One-time setup, ~1 hour total.
 
-- [ ] **Google Play Developer account** — $25 one-time fee.
+- [x] **Google Play Developer account** — $25 one-time fee.
       Register at https://play.google.com/console. Use the same email
       as the Apple Developer account for consistency
       (`naeemsani95@gmail.com`).
-- [ ] **Verify identity in Play Console.** Required for new accounts
+- [x] **Verify identity in Play Console.** Required for new accounts
       since 2023 (passport / driver's license upload). Can take a few
       days — kick off Day 1.
-- [ ] **Create Firebase project** — for FCM push notifications.
+- [x] **Create Firebase project** — for FCM push notifications.
       `https://console.firebase.google.com` → "Add project" → name it
       "HalalNomad". Skip Google Analytics (we use PostHog).
-- [ ] **Add Android app to Firebase project.** Package name
+- [x] **Add Android app to Firebase project.** Package name
       `com.halalnomad.app`. Download `google-services.json` to
       `app/google-services.json` (gitignored).
-- [ ] **Create Play Console service account** for EAS Submit.
-      Play Console → Settings → API access → "Create new service
-      account" → grant "Release Manager" role for the HalalNomad app.
-      Download the JSON, save as `app/play-service-account.json`
-      (gitignored).
-- [ ] **Add both files to `.gitignore`** (verify they're not staged
-      before committing). They contain credentials — never commit.
+- [x] **Create Play Console service account** for EAS Submit.
+      The Play Console UI moved this in ~2024 — "API access" is no
+      longer a top-level item. The reliable modern path:
+      1. Open https://console.cloud.google.com/iam-admin/serviceaccounts
+      2. Pick (or create) a project — same one as Firebase is fine
+      3. **+ CREATE SERVICE ACCOUNT** → name it
+         `halalnomad-play-submit` → Create. Skip role-grant inside
+         Cloud Console (Play Console grants it on its side)
+      4. Open the service account → **Keys** tab →
+         **Add Key → Create new key → JSON** → downloads
+      5. Save as `app/play-service-account.json` (gitignored)
+      6. Back in Play Console → **Users and permissions** (sidebar)
+         → **Invite new users** → paste the service account's email
+         (looks like
+         `halalnomad-play-submit@<project>.iam.gserviceaccount.com`)
+         → grant "Admin (all permissions)" or scoped "Release
+         manager" for HalalNomad → invite
+- [x] **Both credential files gitignored** — landed in commit
+      `9ead605`. Verify they don't show up in `git status` before
+      staging anything else.
 
 ---
 
