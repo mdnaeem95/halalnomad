@@ -1,0 +1,23 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1152 1152" width="1152" height="1152">
+  <!-- Android 12+ splash foreground: transparent bg, content in center safe zone (~768x768). -->
+  <!-- The system places this centered on top of backgroundColor (#1B5E20). imageWidth in   -->
+  <!-- expo-splash-screen plugin controls on-screen scale.                                  -->
+
+  <!-- Location pin centered horizontally, slightly above vertical center to leave room for text -->
+  <g transform="translate(576, 460) scale(1.05)">
+    <!-- Pin body -->
+    <path d="M0-220 C-121-220-220-121-220 0 C-220 88-160 176-60 280 L-20 324 C-8 338 8 338 20 324 L60 280 C160 176 220 88 220 0 C220-121 121-220 0-220z" fill="white"/>
+
+    <!-- Crescent -->
+    <circle cx="0" cy="-10" r="75" fill="#1B5E20"/>
+    <circle cx="28" cy="-10" r="60" fill="white"/>
+
+    <!-- Star -->
+    <polygon points="75,-35 80,-20 95,-20 83,-10 88,5 75,-5 62,5 67,-10 55,-20 70,-20" fill="#1B5E20"/>
+  </g>
+
+  <!-- "HalalNomad" wordmark below pin, within safe zone -->
+  <text x="576" y="940" text-anchor="middle"
+        font-family="system-ui, -apple-system, 'Helvetica Neue', sans-serif"
+        font-size="96" font-weight="800" fill="white" letter-spacing="-2">HalalNomad</text>
+</svg>
