@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useRef, useState } from 'react';
 import {
   KeyboardAvoidingView,
   Platform,
@@ -51,6 +51,7 @@ export default function AddPlaceScreen() {
   // Bumped on successful submit so the autocomplete remounts and clears
   // its internal query / session token.
   const [autocompleteKey, setAutocompleteKey] = useState(0);
+  const mapRef = useRef<MapView>(null);
 
   const {
     control,
@@ -122,6 +123,15 @@ export default function AddPlaceScreen() {
     setPinLocation({ latitude: details.latitude, longitude: details.longitude });
     setSelectedCity(details.city);
     setSelectedCountry(details.country);
+    mapRef.current?.animateToRegion(
+      {
+        latitude: details.latitude,
+        longitude: details.longitude,
+        latitudeDelta: 0.005,
+        longitudeDelta: 0.005,
+      },
+      500
+    );
   }
 
   async function handlePickPhoto() {
@@ -306,6 +316,7 @@ export default function AddPlaceScreen() {
           </Text>
           <View style={styles.mapPickerContainer}>
             <MapView
+              ref={mapRef}
               style={styles.mapPicker}
               provider={PROVIDER_GOOGLE}
               initialRegion={

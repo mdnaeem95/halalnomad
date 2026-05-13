@@ -1,3 +1,4 @@
+import * as FileSystem from 'expo-file-system';
 import { supabase } from '../lib/supabase';
 import { sanitizeText, sanitizeMultiline } from '../lib/sanitize';
 import {
@@ -325,6 +326,12 @@ export async function addReview(
 
 /**
  * Upload a photo and return the public URL.
+ *
+ * Why not fetch(uri).blob(): React Native's blob polyfill returns a
+ * 0-byte blob for local file:// URIs on iOS — the upload succeeds, but
+ * the stored file is empty (verified in storage with content-length: 0).
+ * Reading via expo-file-system as base64 + decoding to a Uint8Array is
+ * the documented Supabase-RN pattern.
  */
 export async function uploadPhoto(
   uri: string,
@@ -332,10 +339,17 @@ export async function uploadPhoto(
   folder: string = 'places'
 ): Promise<string> {
   const fileName = `${folder}/${userId}/${Date.now()}.jpg`;
-  const response = await fetch(uri);
-  const blob = await response.blob();
 
-  const { error } = await supabase.storage.from('photos').upload(fileName, blob, {
+  const base64 = await FileSystem.readAsStringAsync(uri, {
+    encoding: FileSystem.EncodingType.Base64,
+  });
+  const binary = atob(base64);
+  const bytes = new Uint8Array(binary.length);
+  for (let i = 0; i < binary.length; i++) {
+    bytes[i] = binary.charCodeAt(i);
+  }
+
+  const { error } = await supabase.storage.from('photos').upload(fileName, bytes, {
     contentType: 'image/jpeg',
     upsert: false,
   });
