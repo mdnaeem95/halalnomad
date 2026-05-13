@@ -160,12 +160,19 @@ export default function AddPlaceScreen() {
             ],
           });
         },
-        onError: () => {
+        onError: (error: unknown) => {
+          // Surface the real error message so we can diagnose remote
+          // reports. The hook-level onError still ships it to Sentry;
+          // this is the user-visible companion.
+          const raw =
+            (error as { message?: string } | null)?.message ??
+            (typeof error === 'string' ? error : '');
+          const details = raw ? raw.slice(0, 200) : 'unknown error';
           setDialog({
             visible: true,
             variant: 'error',
-            title: 'Something went wrong',
-            message: 'Failed to add place. Please check your connection and try again.',
+            title: 'Failed to add place',
+            message: `Something went wrong. If this keeps happening, share this with us:\n\n${details}`,
           });
         },
       }
