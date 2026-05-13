@@ -265,9 +265,29 @@ export default function PlaceDetailScreen() {
     const platformName = platform === 'tiktok' ? 'TikTok' : 'Instagram';
     await Clipboard.setStringAsync(place.name_en);
     track(EVENTS.PLACE_EXTERNAL_SEARCH, { platform, place_id: place.id });
-    showToast(`Place name copied — paste in ${platformName} search`, 'info');
-    Linking.openURL(buildExternalSearchUrl(platform, place)).catch(() => {
-      showToast(`Could not open ${platformName}`, 'error');
+
+    // Confirm via dialog before navigating away. Both platforms strip
+    // the query from search deep links, so the user needs to paste
+    // manually — telling them that AFTER they've switched apps is too
+    // late (toast already gone).
+    setDialog({
+      visible: true,
+      variant: 'info',
+      title: 'Place name copied',
+      message: `"${place.name_en}" is on your clipboard. Open ${platformName} and paste it in the search bar to find this place.`,
+      actions: [
+        {
+          label: `Open ${platformName}`,
+          style: 'primary',
+          onPress: () => {
+            closeDialog();
+            Linking.openURL(buildExternalSearchUrl(platform, place)).catch(() => {
+              showToast(`Could not open ${platformName}`, 'error');
+            });
+          },
+        },
+        { label: 'Cancel', onPress: closeDialog, style: 'cancel' },
+      ],
     });
   }
 
