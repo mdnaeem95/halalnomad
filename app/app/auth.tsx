@@ -35,10 +35,6 @@ export default function AuthScreen() {
   const [isLoading, setIsLoading] = useState(false);
   const [verifyEmail, setVerifyEmail] = useState('');
   const [verifyPassword, setVerifyPassword] = useState('');
-  // Bump on form reset / mode switch so uncontrolled TextInputs remount
-  // and visibly clear (defaultValue is only read on first render).
-  const [inputResetKey, setInputResetKey] = useState(0);
-
   useEffect(() => {
     // Fires every time the auth modal is opened — captures all entry
     // paths (place verify CTA, profile sign-in, add-place gate, etc.)
@@ -114,7 +110,6 @@ export default function AuthScreen() {
     setMode(mode === 'signin' ? 'signup' : 'signin');
     signInForm.reset();
     signUpForm.reset();
-    setInputResetKey((k) => k + 1);
   }
 
   // Verification pending screen
@@ -184,10 +179,9 @@ export default function AuthScreen() {
               name="displayName"
               render={({ field: { onChange, onBlur, value } }) => (
                 <TextInput
-                  key={`signup-displayName-${inputResetKey}`}
                   style={[styles.input, signUpForm.formState.errors.displayName && styles.inputError]}
                   placeholder="Display name"
-                  defaultValue={value}
+                  value={value}
                   onChangeText={onChange}
                   onBlur={onBlur}
                   autoCapitalize="words"
@@ -206,10 +200,9 @@ export default function AuthScreen() {
               name="email"
               render={({ field: { onChange, onBlur, value } }) => (
                 <TextInput
-                  key={`signup-email-${inputResetKey}`}
                   style={[styles.input, signUpForm.formState.errors.email && styles.inputError]}
                   placeholder="Email"
-                  defaultValue={value}
+                  value={value}
                   onChangeText={onChange}
                   onBlur={onBlur}
                   keyboardType="email-address"
@@ -230,10 +223,9 @@ export default function AuthScreen() {
               name="password"
               render={({ field: { onChange, onBlur, value } }) => (
                 <TextInput
-                  key={`signup-password-${inputResetKey}`}
                   style={[styles.input, signUpForm.formState.errors.password && styles.inputError]}
                   placeholder="Password"
-                  defaultValue={value}
+                  value={value}
                   onChangeText={onChange}
                   onBlur={onBlur}
                   secureTextEntry
@@ -254,10 +246,9 @@ export default function AuthScreen() {
               name="email"
               render={({ field: { onChange, onBlur, value } }) => (
                 <TextInput
-                  key={`signin-email-${inputResetKey}`}
                   style={[styles.input, signInForm.formState.errors.email && styles.inputError]}
                   placeholder="Email"
-                  defaultValue={value}
+                  value={value}
                   onChangeText={onChange}
                   onBlur={onBlur}
                   keyboardType="email-address"
@@ -278,10 +269,9 @@ export default function AuthScreen() {
               name="password"
               render={({ field: { onChange, onBlur, value } }) => (
                 <TextInput
-                  key={`signin-password-${inputResetKey}`}
                   style={[styles.input, signInForm.formState.errors.password && styles.inputError]}
                   placeholder="Password"
-                  defaultValue={value}
+                  value={value}
                   onChangeText={onChange}
                   onBlur={onBlur}
                   secureTextEntry

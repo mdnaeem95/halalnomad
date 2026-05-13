@@ -271,6 +271,20 @@ export default function ExploreScreen() {
                 )}
                 onViewableItemsChanged={onViewableItemsChanged}
                 viewabilityConfig={viewabilityConfig}
+                // Fixed card width + spacing → we can compute offsets
+                // directly, so scrollToIndex never has to wait for the
+                // virtualized window to catch up to an offscreen marker.
+                getItemLayout={(_, index) => ({
+                  length: CARD_WIDTH + CARD_SPACING,
+                  offset: (CARD_WIDTH + CARD_SPACING) * index,
+                  index,
+                })}
+                onScrollToIndexFailed={(info) => {
+                  carouselRef.current?.scrollToOffset({
+                    offset: (CARD_WIDTH + CARD_SPACING) * info.index,
+                    animated: true,
+                  });
+                }}
               />
             </View>
           )}
