@@ -22,6 +22,8 @@ import { useTheme } from '../../src/hooks/useTheme';
 import { addPlaceSchema, AddPlaceInput } from '../../src/lib/schemas';
 import { CuisineType, CUISINE_LABELS, PriceRange, PRICE_LABELS } from '../../src/types';
 import { AppDialog, Toast } from '../../src/components/AppDialog';
+import { PlacesAutocomplete } from '../../src/components/PlacesAutocomplete';
+import { PlaceDetails } from '../../src/services/google-places';
 import {
   AppColors,
   borderRadius,
@@ -40,11 +42,21 @@ export default function AddPlaceScreen() {
   const addPlaceMutation = useAddPlace();
   const [photos, setPhotos] = useState<string[]>([]);
   const [pinLocation, setPinLocation] = useState<{ latitude: number; longitude: number } | null>(null);
+  // City + country aren't form fields — they're set when the user picks
+  // a result from PlacesAutocomplete, and passed through to the mutation
+  // so the Browse view picks user-added places up too (until now they
+  // stayed NULL and got hidden from Browse — see migration 012).
+  const [selectedCity, setSelectedCity] = useState<string | null>(null);
+  const [selectedCountry, setSelectedCountry] = useState<string | null>(null);
+  // Bumped on successful submit so the autocomplete remounts and clears
+  // its internal query / session token.
+  const [autocompleteKey, setAutocompleteKey] = useState(0);
 
   const {
     control,
     handleSubmit,
     reset,
+    setValue,
     formState: { errors },
   } = useForm<AddPlaceInput>({
     resolver: zodResolver(addPlaceSchema),
@@ -96,6 +108,22 @@ export default function AddPlaceScreen() {
     );
   }
 
+  function handlePlaceSelected(details: PlaceDetails) {
+    setValue('nameEn', details.nameEn, { shouldValidate: true });
+    setValue('nameLocal', details.nameLocal ?? '', { shouldValidate: true });
+    setValue('addressEn', details.addressEn, { shouldValidate: true });
+    setValue('addressLocal', details.addressLocal ?? '', { shouldValidate: true });
+    if (details.priceLevel) {
+      setValue('priceRange', details.priceLevel as PriceRange);
+    }
+    if (details.cuisineType) {
+      setValue('cuisineType', details.cuisineType as CuisineType);
+    }
+    setPinLocation({ latitude: details.latitude, longitude: details.longitude });
+    setSelectedCity(details.city);
+    setSelectedCountry(details.country);
+  }
+
   async function handlePickPhoto() {
     const result = await ImagePicker.launchImageLibraryAsync({
       mediaTypes: ['images'],
@@ -134,6 +162,8 @@ export default function AddPlaceScreen() {
           price_range: data.priceRange as PriceRange | undefined,
           description: data.description || undefined,
           hours: data.hours || undefined,
+          city: selectedCity ?? undefined,
+          country: selectedCountry ?? undefined,
         },
         userId: user!.id,
         photoUris: photos,
@@ -154,6 +184,9 @@ export default function AddPlaceScreen() {
                   reset();
                   setPhotos([]);
                   setPinLocation(null);
+                  setSelectedCity(null);
+                  setSelectedCountry(null);
+                  setAutocompleteKey((k) => k + 1);
                 },
                 style: 'primary',
               },
@@ -185,7 +218,14 @@ export default function AddPlaceScreen() {
         style={[styles.container, { backgroundColor: c.background }]}
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
       >
-        <ScrollView contentContainerStyle={styles.form}>
+        <ScrollView contentContainerStyle={styles.form} keyboardShouldPersistTaps="handled">
+          <Text style={[styles.sectionTitle, { color: c.textPrimary }]}>Find your place</Text>
+          <Text style={[styles.fieldLabel, { color: c.textSecondary }]}>
+            Search Google to fill the form automatically. You can still edit any
+            field below to refine.
+          </Text>
+          <PlacesAutocomplete key={autocompleteKey} onPlaceSelected={handlePlaceSelected} />
+
           <Text style={[styles.sectionTitle, { color: c.textPrimary }]}>Place Details</Text>
 
           <Text style={[styles.fieldLabel, { color: c.textSecondary }]}>Name (English) *</Text>
@@ -260,7 +300,9 @@ export default function AddPlaceScreen() {
 
           <Text style={[styles.sectionTitle, { color: c.textPrimary }]}>Restaurant Location *</Text>
           <Text style={[styles.fieldLabel, { color: c.textSecondary }]}>
-            Tap the map to place a pin at the restaurant's location
+            {pinLocation
+              ? 'Tap the map to adjust if the pin is off.'
+              : 'Search above to set the location, or tap the map to place a pin.'}
           </Text>
           <View style={styles.mapPickerContainer}>
             <MapView

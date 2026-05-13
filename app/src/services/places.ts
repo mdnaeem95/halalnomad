@@ -180,6 +180,11 @@ interface AddPlaceInput {
   description?: string;
   hours?: string;
   photos?: string[];
+  // Populated from PlacesAutocomplete selection (not user-typed). Left
+  // undefined for manual submissions; the Browse view filters them out
+  // until someone moderates and backfills.
+  city?: string;
+  country?: string;
 }
 
 /**
@@ -195,6 +200,8 @@ export async function addPlace(input: AddPlaceInput, userId: string): Promise<Pl
     address_local: input.address_local ? sanitizeText(input.address_local) : undefined,
     description: input.description ? sanitizeMultiline(input.description) : undefined,
     hours: input.hours ? sanitizeText(input.hours) : undefined,
+    city: input.city ? sanitizeText(input.city) : undefined,
+    country: input.country ? sanitizeText(input.country) : undefined,
   };
 
   const { data, error } = await supabase
