@@ -22,6 +22,7 @@ export const EVENTS = {
   PLACE_VIEWED: 'place_viewed',
   PLACE_DIRECTIONS: 'place_directions',
   PLACE_ADDRESS_COPIED: 'place_address_copied',
+  PLACE_EXTERNAL_SEARCH: 'place_external_search',
   SEARCH_PERFORMED: 'search_performed',
   CUISINE_FILTER_USED: 'cuisine_filter_used',
   VIEW_MODE_CHANGED: 'view_mode_changed',

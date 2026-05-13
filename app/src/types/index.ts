@@ -124,6 +124,28 @@ export const POINTS_TABLE = {
   report_place: 10,
 } as const;
 
+// Provenance record on a place. Written by `promote_staged_place` for
+// seeded rows (migration 007); empty array for user-contributed rows.
+// Surfaced verbatim on the place detail screen as the "How we know"
+// section — keeping the source/identifier visible is part of the
+// trust premise (CLAUDE.md non-negotiable #6).
+export interface PlaceSource {
+  source: string;
+  source_id: string;
+  imported_at: string;
+}
+
+// Human-readable labels for known source identifiers. Anything not in
+// this map falls through to title-cased version of the raw identifier.
+export const SOURCE_LABELS: Record<string, string> = {
+  google_places: 'Google Places',
+  halal_navi: 'Halal Navi',
+  crescentrating: 'CrescentRating',
+  halaltrip: 'HalalTrip',
+  jakim: 'JAKIM',
+  muis: 'MUIS',
+};
+
 export interface Place {
   id: string;
   name_en: string;
@@ -151,6 +173,7 @@ export interface Place {
   place_type: PlaceType;
   city: string | null;
   country: string | null;
+  sources: PlaceSource[];
 }
 
 // ============================================

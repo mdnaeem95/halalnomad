@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import {
+  Linking,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -17,7 +18,15 @@ import { useTheme } from '../../src/hooks/useTheme';
 import { useCooldown } from '../../src/hooks/useCooldown';
 import { useAddReview, usePlace, useReviews, useUserVerifications, useVerifyPlace } from '../../src/hooks/usePlaces';
 import { getMapProvider } from '../../src/services/map';
-import { CUISINE_LABELS, PRICE_LABELS, PLACE_TYPE_LABELS } from '../../src/types';
+import {
+  CUISINE_LABELS,
+  HALAL_LEVEL_LABELS,
+  HalalLevel,
+  Place,
+  PLACE_TYPE_LABELS,
+  PRICE_LABELS,
+  SOURCE_LABELS,
+} from '../../src/types';
 import { HalalBadge } from '../../src/components/HalalBadge';
 import { FeaturedBadge } from '../../src/components/FeaturedBadge';
 import { usePremiumGuard } from '../../src/components/PremiumGate';
@@ -33,6 +42,37 @@ import {
   typography,
 } from '../../src/constants/theme';
 import { FEATURES } from '../../src/constants/features';
+import { EVENTS, track } from '../../src/lib/analytics';
+
+// Trust-level explainer copy, surfaced inline on the "How we know" card.
+// Mirrors the launch-posts trust carousel so the in-app and marketing
+// language stay aligned.
+const TRUST_LEVEL_EXPLAINER: Record<HalalLevel, string> = {
+  1: 'Reported by a traveller. Needs 3 community confirmations to upgrade.',
+  2: 'Confirmed by 3+ travellers as Halal. Recommended to verify on arrival.',
+  3: 'A traveller uploaded a Halal certificate or Halal-only menu photo.',
+  4: 'Certified by an official Halal authority.',
+};
+
+type ExternalPlatform = 'tiktok' | 'instagram';
+
+function formatSourceName(source: string): string {
+  return SOURCE_LABELS[source] ?? source.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
+}
+
+function formatDate(iso: string | null): string {
+  if (!iso) return '—';
+  return new Date(iso).toLocaleDateString('en-US', { day: 'numeric', month: 'short', year: 'numeric' });
+}
+
+function buildExternalSearchUrl(platform: ExternalPlatform, place: Place): string {
+  const parts = [place.name_en];
+  if (place.city) parts.push(place.city);
+  const q = encodeURIComponent(parts.join(' '));
+  return platform === 'tiktok'
+    ? `https://www.tiktok.com/search?q=${q}`
+    : `https://www.instagram.com/explore/search/keyword/?q=${q}`;
+}
 
 export default function PlaceDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -210,6 +250,15 @@ export default function PlaceDetailScreen() {
     showToast('Address copied to clipboard', 'info');
   }
 
+  function handleExternalSearch(platform: ExternalPlatform) {
+    if (!place) return;
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    track(EVENTS.PLACE_EXTERNAL_SEARCH, { platform, place_id: place.id });
+    Linking.openURL(buildExternalSearchUrl(platform, place)).catch(() => {
+      showToast(`Could not open ${platform === 'tiktok' ? 'TikTok' : 'Instagram'}`, 'error');
+    });
+  }
+
   if (placeLoading) {
     return <PlaceDetailSkeleton />;
   }
@@ -331,6 +380,57 @@ export default function PlaceDetailScreen() {
           )}
         </View>
 
+        {/* How we know — provenance + trust transparency */}
+        <View style={[styles.detailsCard, styles.howWeKnowCard, { backgroundColor: c.surface }]}>
+          <View style={styles.howWeKnowHeader}>
+            <Ionicons name="information-circle-outline" size={18} color={c.primary} />
+            <Text style={[styles.howWeKnowTitle, { color: c.textPrimary }]}>
+              How we know about this place
+            </Text>
+          </View>
+
+          <View style={[styles.divider, { backgroundColor: c.divider }]} />
+
+          <View style={styles.detailRow}>
+            <Text style={[styles.detailLabel, { color: c.textTertiary }]}>Source</Text>
+            {place.sources && place.sources.length > 0 ? (
+              place.sources.map((src, i) => (
+                <Text key={`${src.source}-${i}`} style={[styles.detailValue, { color: c.textPrimary }]}>
+                  Imported from {formatSourceName(src.source)} · {formatDate(src.imported_at)}
+                </Text>
+              ))
+            ) : (
+              <Text style={[styles.detailValue, { color: c.textPrimary }]}>
+                Added by a HalalNomad traveller · {formatDate(place.created_at)}
+              </Text>
+            )}
+          </View>
+
+          <View style={[styles.divider, { backgroundColor: c.divider }]} />
+
+          <View style={styles.detailRow}>
+            <Text style={[styles.detailLabel, { color: c.textTertiary }]}>Verifications</Text>
+            <Text style={[styles.detailValue, { color: c.textPrimary }]}>
+              {place.verification_count === 0
+                ? 'No community confirmations yet'
+                : `Confirmed by ${place.verification_count} ${place.verification_count === 1 ? 'traveller' : 'travellers'}`}
+              {place.last_verified_at ? ` · last on ${formatDate(place.last_verified_at)}` : ''}
+            </Text>
+          </View>
+
+          <View style={[styles.divider, { backgroundColor: c.divider }]} />
+
+          <View style={styles.detailRow}>
+            <Text style={[styles.detailLabel, { color: c.textTertiary }]}>Trust level</Text>
+            <Text style={[styles.detailValue, { color: c.textPrimary }]}>
+              {HALAL_LEVEL_LABELS[place.halal_level]}
+            </Text>
+            <Text style={[styles.howWeKnowExplainer, { color: c.textSecondary }]}>
+              {TRUST_LEVEL_EXPLAINER[place.halal_level]}
+            </Text>
+          </View>
+        </View>
+
         {/* Action buttons */}
         <View style={styles.actions}>
           <Pressable
@@ -342,6 +442,33 @@ export default function PlaceDetailScreen() {
             <Ionicons name="navigate-outline" size={18} color={c.textOnPrimary} />
             <Text style={styles.primaryButtonText}>Get Directions</Text>
           </Pressable>
+
+          {/* Look up reviews on external platforms — travellers often
+              cross-check with TikTok / Instagram before committing. We
+              ride the reflex without rendering their content. */}
+          <View style={styles.lookupSection}>
+            <Text style={[styles.lookupHeader, { color: c.textTertiary }]}>LOOK UP REVIEWS</Text>
+            <View style={styles.lookupRow}>
+              <Pressable
+                style={[styles.lookupButton, { backgroundColor: c.surface, borderColor: c.border }]}
+                onPress={() => handleExternalSearch('tiktok')}
+                accessibilityRole="button"
+                accessibilityLabel={`Search ${place.name_en} on TikTok`}
+              >
+                <Ionicons name="logo-tiktok" size={18} color={c.textPrimary} />
+                <Text style={[styles.lookupButtonText, { color: c.textPrimary }]}>TikTok</Text>
+              </Pressable>
+              <Pressable
+                style={[styles.lookupButton, { backgroundColor: c.surface, borderColor: c.border }]}
+                onPress={() => handleExternalSearch('instagram')}
+                accessibilityRole="button"
+                accessibilityLabel={`Search ${place.name_en} on Instagram`}
+              >
+                <Ionicons name="logo-instagram" size={18} color={c.textPrimary} />
+                <Text style={[styles.lookupButtonText, { color: c.textPrimary }]}>Instagram</Text>
+              </Pressable>
+            </View>
+          </View>
 
           {/* Save to List — Premium-gated. Hidden until Phase 2 features
               ship and Premium is re-enabled. See src/constants/features.ts. */}
@@ -581,6 +708,59 @@ const createStyles = (c: AppColors) => StyleSheet.create({
     height: 1,
     backgroundColor: c.divider,
     marginHorizontal: spacing.md,
+  },
+  howWeKnowCard: {
+    marginTop: spacing.md,
+  },
+  howWeKnowHeader: {
+    padding: spacing.md,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+  },
+  howWeKnowTitle: {
+    ...typography.label,
+    color: c.textPrimary,
+    fontSize: 14,
+    fontWeight: '700',
+  },
+  howWeKnowExplainer: {
+    ...typography.bodySmall,
+    color: c.textSecondary,
+    marginTop: spacing.xs,
+    lineHeight: 18,
+  },
+  lookupSection: {
+    gap: spacing.xs,
+  },
+  lookupHeader: {
+    ...typography.caption,
+    color: c.textTertiary,
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+    marginTop: spacing.xs,
+  },
+  lookupRow: {
+    flexDirection: 'row',
+    gap: spacing.sm,
+  },
+  lookupButton: {
+    flex: 1,
+    backgroundColor: c.surface,
+    borderRadius: borderRadius.md,
+    padding: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+    flexDirection: 'row',
+    gap: spacing.sm,
+    borderWidth: 1,
+    borderColor: c.border,
+  },
+  lookupButtonText: {
+    ...typography.label,
+    color: c.textPrimary,
+    fontSize: 14,
+    fontWeight: '600',
   },
   actions: {
     padding: spacing.md,
