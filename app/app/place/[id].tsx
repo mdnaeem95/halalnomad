@@ -65,13 +65,22 @@ function formatDate(iso: string | null): string {
   return new Date(iso).toLocaleDateString('en-US', { day: 'numeric', month: 'short', year: 'numeric' });
 }
 
+// TikTok and Instagram both strip the keyword query when the OS hands
+// their universal-link search URLs off to the native app — verified in
+// production. The only URLs that deep-link reliably *with content
+// intact* are hashtag pages. We send the user to the city's `halal<city>`
+// tag (high-volume on both platforms) and copy the place name to the
+// clipboard so a single paste narrows to the specific place.
+function buildCityHalalTag(city: string | null, country: string | null): string {
+  const base = (city ?? country ?? '').toLowerCase().replace(/[^a-z0-9]/g, '');
+  return base ? `halal${base}` : 'halal';
+}
+
 function buildExternalSearchUrl(platform: ExternalPlatform, place: Place): string {
-  const parts = [place.name_en];
-  if (place.city) parts.push(place.city);
-  const q = encodeURIComponent(parts.join(' '));
+  const tag = buildCityHalalTag(place.city, place.country);
   return platform === 'tiktok'
-    ? `https://www.tiktok.com/search?q=${q}`
-    : `https://www.instagram.com/explore/search/keyword/?q=${q}`;
+    ? `https://www.tiktok.com/tag/${tag}`
+    : `https://www.instagram.com/explore/tags/${tag}/`;
 }
 
 export default function PlaceDetailScreen() {
@@ -250,12 +259,15 @@ export default function PlaceDetailScreen() {
     showToast('Address copied to clipboard', 'info');
   }
 
-  function handleExternalSearch(platform: ExternalPlatform) {
+  async function handleExternalSearch(platform: ExternalPlatform) {
     if (!place) return;
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    const platformName = platform === 'tiktok' ? 'TikTok' : 'Instagram';
+    await Clipboard.setStringAsync(place.name_en);
     track(EVENTS.PLACE_EXTERNAL_SEARCH, { platform, place_id: place.id });
+    showToast(`Place name copied — paste in ${platformName} search`, 'info');
     Linking.openURL(buildExternalSearchUrl(platform, place)).catch(() => {
-      showToast(`Could not open ${platform === 'tiktok' ? 'TikTok' : 'Instagram'}`, 'error');
+      showToast(`Could not open ${platformName}`, 'error');
     });
   }
 
