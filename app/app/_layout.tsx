@@ -29,11 +29,20 @@ SplashScreen.preventAutoHideAsync().catch(() => {});
 initSentry();
 initRevenueCat();
 
+// First-install boot can stack: expo-updates manifest check, JS cold
+// start on cheap Android, AsyncStorage cold init, Supabase session
+// restore. Even if each is sub-second, together they sum to "feels
+// stuck on the splash." Cap how long we'll block on auth before we
+// just render the app — once auth resolves (likely as null = logged
+// out for fresh installs), the user state hydrates reactively.
+const AUTH_BOOT_TIMEOUT_MS = 8000;
+
 function AppStack() {
   const { t } = useTranslation();
   const { colors, isDark } = useTheme();
   const { user, isLoading: authLoading } = useAuth();
   const [onboardingDone, setOnboardingDone] = useState<boolean | null>(null);
+  const [authBootExpired, setAuthBootExpired] = useState(false);
   useNotifications(user?.id ?? null);
 
   useEffect(() => {
@@ -48,6 +57,11 @@ function AppStack() {
       .catch(() => setOnboardingDone(true)); // fail open — never block on storage
   }, []);
 
+  useEffect(() => {
+    const t = setTimeout(() => setAuthBootExpired(true), AUTH_BOOT_TIMEOUT_MS);
+    return () => clearTimeout(t);
+  }, []);
+
   async function handleOnboardingComplete() {
     setOnboardingDone(true);
     try {
@@ -58,11 +72,19 @@ function AppStack() {
     }
   }
 
-  if (authLoading || onboardingDone === null) {
+  // Block on the splash while auth + onboarding resolve, but never past
+  // AUTH_BOOT_TIMEOUT_MS. Onboarding flag uses AsyncStorage which has a
+  // .catch fail-open in place — if it's still null past the timeout
+  // we treat it as "show onboarding" (first launch). Auth still
+  // resolves async after the timeout fires; the app re-renders when it
+  // does.
+  if ((authLoading || onboardingDone === null) && !authBootExpired) {
     return <LoadingSplash />;
   }
 
-  if (!onboardingDone) {
+  const effectiveOnboardingDone = onboardingDone ?? false;
+
+  if (!effectiveOnboardingDone) {
     return (
       <>
         <StatusBar style="light" />

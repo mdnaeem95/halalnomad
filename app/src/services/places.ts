@@ -26,14 +26,18 @@ interface FetchPlacesOptions {
 }
 
 /**
- * Fetch places near a location. Uses PostGIS earth_distance for radius queries.
- * Falls back to fetching all places if none are found nearby.
+ * Fetch places near a location via PostGIS earth_distance.
+ *
+ * Returns an empty array when nothing is in range — callers MUST handle
+ * the empty state. The previous implementation silently fell back to
+ * "recently added places worldwide" when the radius came back empty,
+ * which surfaced as cards pretending to be nearby. That's worse than
+ * an empty state because it looks plausible.
  */
 export async function fetchNearbyPlaces(options: FetchPlacesOptions): Promise<Place[]> {
   const { location, radiusKm = 50, cuisineType, minHalalLevel, limit = 50 } = options;
 
   try {
-    // Use a Supabase RPC function for geospatial query
     let query = supabase.rpc('nearby_places', {
       lat: location.latitude,
       lng: location.longitude,
@@ -48,31 +52,11 @@ export async function fetchNearbyPlaces(options: FetchPlacesOptions): Promise<Pl
     }
 
     const { data, error } = await query.limit(limit);
-
-    if (!error && data && data.length > 0) {
-      return data as Place[];
-    }
+    if (error) return [];
+    return (data as Place[]) ?? [];
   } catch {
-    // RPC failed — fall through to fetchAllPlaces
+    return [];
   }
-
-  // Fallback: fetch all places if nearby query returned nothing or failed
-  return fetchAllPlaces(limit);
-}
-
-/**
- * Fetch all active places (used as fallback when no nearby places exist).
- */
-export async function fetchAllPlaces(limit: number = 50): Promise<Place[]> {
-  const { data, error } = await supabase
-    .from('places')
-    .select('*')
-    .eq('is_active', true)
-    .order('created_at', { ascending: false })
-    .limit(limit);
-
-  if (error) throw error;
-  return (data as Place[]) ?? [];
 }
 
 /**

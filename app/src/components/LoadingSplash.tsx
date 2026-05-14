@@ -1,4 +1,4 @@
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { Animated, StyleSheet, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { spacing, typography } from '../constants/theme';
@@ -11,11 +11,23 @@ const SPLASH_BG = '#1B5E20';
  *
  * Used both at app boot (while auth is resolving) and on the Explore tab
  * while location resolves.
+ *
+ * If no explicit `message` is passed, the bottom row cycles through
+ * progressive hints — by 5s "Setting things up", by 12s "Almost there"
+ * — so first-install users with slow networks see the app working
+ * rather than feeling frozen on a static splash.
  */
+const PROGRESS_STEPS = [
+  { at: 0, text: 'Getting ready' },
+  { at: 5000, text: 'Setting things up' },
+  { at: 12000, text: 'Almost there' },
+];
+
 export function LoadingSplash({ message }: { message?: string } = {}) {
   const pulseAnim = useRef(new Animated.Value(1)).current;
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const dotAnim = useRef(new Animated.Value(0)).current;
+  const [progressIndex, setProgressIndex] = useState(0);
 
   useEffect(() => {
     Animated.loop(
@@ -40,6 +52,18 @@ export function LoadingSplash({ message }: { message?: string } = {}) {
     ).start();
   }, []);
 
+  // Progressive messaging — only when no explicit message was passed.
+  // Cleared on unmount so we don't update state after teardown.
+  useEffect(() => {
+    if (message) return;
+    const timers: ReturnType<typeof setTimeout>[] = [];
+    PROGRESS_STEPS.forEach((step, i) => {
+      if (step.at === 0) return;
+      timers.push(setTimeout(() => setProgressIndex(i), step.at));
+    });
+    return () => timers.forEach(clearTimeout);
+  }, [message]);
+
   return (
     <View style={styles.container}>
       <Animated.View style={[styles.iconContainer, { transform: [{ scale: pulseAnim }] }]}>
@@ -56,7 +80,9 @@ export function LoadingSplash({ message }: { message?: string } = {}) {
 
       <Animated.View style={[styles.loadingRow, { opacity: dotAnim }]}>
         <Ionicons name="location" size={14} color="rgba(255,255,255,0.8)" />
-        <Text style={styles.loadingText}>{message ?? 'Getting ready'}</Text>
+        <Text style={styles.loadingText}>
+          {message ?? PROGRESS_STEPS[progressIndex].text}
+        </Text>
       </Animated.View>
     </View>
   );

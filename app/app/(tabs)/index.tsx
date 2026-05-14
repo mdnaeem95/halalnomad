@@ -242,6 +242,23 @@ export default function ExploreScreen() {
             </Pressable>
           )}
 
+          {places.length === 0 && !isLoading && (
+            // Replaces the old behaviour where we silently showed "recently
+            // added places worldwide" pretending they were nearby. Now if
+            // there's nothing in a 50km radius the user gets an honest
+            // empty state with a path forward.
+            <Pressable
+              style={[styles.placeCount, { backgroundColor: c.surface }]}
+              onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); handleToggle('browse'); }}
+            >
+              <Ionicons name="globe-outline" size={14} color={c.primary} />
+              <Text style={[styles.placeCountText, { color: c.primary }]}>
+                No Halal places near you — browse by city
+              </Text>
+              <Ionicons name="chevron-forward" size={14} color={c.primary} />
+            </Pressable>
+          )}
+
           {showCarousel && (
             <View style={styles.carouselContainer}>
               <Pressable
