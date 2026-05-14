@@ -18,6 +18,7 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { useAuth } from '../../src/hooks/useAuth';
 import { useAddPlace } from '../../src/hooks/usePlaces';
 import { useLocation } from '../../src/hooks/useLocation';
+import { findExistingPlace } from '../../src/services/places';
 import { useTheme } from '../../src/hooks/useTheme';
 import { addPlaceSchema, AddPlaceInput } from '../../src/lib/schemas';
 import { CuisineType, CUISINE_LABELS, PriceRange, PRICE_LABELS } from '../../src/types';
@@ -52,6 +53,14 @@ export default function AddPlaceScreen() {
   // its internal query / session token.
   const [autocompleteKey, setAutocompleteKey] = useState(0);
   const mapRef = useRef<MapView>(null);
+  // Google place_id of the most recent autocomplete pick. Powers the
+  // layer-1 dedup check and gets written into places.sources on insert.
+  // Cleared when the user manually overrides the pin (they're indicating
+  // a different place than what autocomplete picked).
+  const [selectedGooglePlaceId, setSelectedGooglePlaceId] = useState<string | null>(null);
+  // Pre-submit duplicate check runs before the mutation. Track it
+  // separately so the submit button disables during the check too.
+  const [isCheckingDuplicates, setIsCheckingDuplicates] = useState(false);
 
   const {
     control,
@@ -123,6 +132,7 @@ export default function AddPlaceScreen() {
     setPinLocation({ latitude: details.latitude, longitude: details.longitude });
     setSelectedCity(details.city);
     setSelectedCountry(details.country);
+    setSelectedGooglePlaceId(details.placeId);
     mapRef.current?.animateToRegion(
       {
         latitude: details.latitude,
@@ -147,7 +157,7 @@ export default function AddPlaceScreen() {
     }
   }
 
-  function onSubmit(data: AddPlaceInput) {
+  async function onSubmit(data: AddPlaceInput) {
     const coords = pinLocation ?? location;
     if (!coords) {
       setDialog({
@@ -159,6 +169,49 @@ export default function AddPlaceScreen() {
       return;
     }
 
+    // Dedup check — by Google place_id (autocomplete) then by 50m radius
+    // (manual). Failure of the check itself is silently treated as "no
+    // match" so we don't gate submission on a flaky network call.
+    setIsCheckingDuplicates(true);
+    const existing = await findExistingPlace({
+      googlePlaceId: selectedGooglePlaceId ?? undefined,
+      lat: coords.latitude,
+      lng: coords.longitude,
+    });
+    setIsCheckingDuplicates(false);
+
+    if (existing) {
+      setDialog({
+        visible: true,
+        variant: 'info',
+        title: 'Already on HalalNomad',
+        message: `Looks like "${existing.name_en}" is already on HalalNomad. Want to view it, or add this as a separate entry?`,
+        actions: [
+          {
+            label: 'View existing',
+            style: 'primary',
+            onPress: () => {
+              closeDialog();
+              router.push(`/place/${existing.id}`);
+            },
+          },
+          {
+            label: 'Add as new',
+            onPress: () => {
+              closeDialog();
+              submitMutation(data, coords);
+            },
+          },
+          { label: 'Cancel', onPress: closeDialog, style: 'cancel' },
+        ],
+      });
+      return;
+    }
+
+    submitMutation(data, coords);
+  }
+
+  function submitMutation(data: AddPlaceInput, coords: { latitude: number; longitude: number }) {
     addPlaceMutation.mutate(
       {
         input: {
@@ -174,6 +227,7 @@ export default function AddPlaceScreen() {
           hours: data.hours || undefined,
           city: selectedCity ?? undefined,
           country: selectedCountry ?? undefined,
+          google_place_id: selectedGooglePlaceId ?? undefined,
         },
         userId: user!.id,
         photoUris: photos,
@@ -196,6 +250,7 @@ export default function AddPlaceScreen() {
                   setPinLocation(null);
                   setSelectedCity(null);
                   setSelectedCountry(null);
+                  setSelectedGooglePlaceId(null);
                   setAutocompleteKey((k) => k + 1);
                 },
                 style: 'primary',
@@ -334,13 +389,22 @@ export default function AddPlaceScreen() {
                     }
               }
               showsUserLocation
-              onPress={(e) => setPinLocation(e.nativeEvent.coordinate)}
+              onPress={(e) => {
+                // Manual pin override invalidates the autocomplete pick —
+                // user's signalling "different place" so the place_id is
+                // no longer reliable for dedup.
+                setPinLocation(e.nativeEvent.coordinate);
+                setSelectedGooglePlaceId(null);
+              }}
             >
               {pinLocation && (
                 <Marker
                   coordinate={pinLocation}
                   draggable
-                  onDragEnd={(e) => setPinLocation(e.nativeEvent.coordinate)}
+                  onDragEnd={(e) => {
+                    setPinLocation(e.nativeEvent.coordinate);
+                    setSelectedGooglePlaceId(null);
+                  }}
                 />
               )}
             </MapView>
@@ -457,12 +521,19 @@ export default function AddPlaceScreen() {
           </Pressable>
 
           <Pressable
-            style={[styles.primaryButton, addPlaceMutation.isPending && styles.buttonDisabled]}
+            style={[
+              styles.primaryButton,
+              (addPlaceMutation.isPending || isCheckingDuplicates) && styles.buttonDisabled,
+            ]}
             onPress={handleSubmit(onSubmit)}
-            disabled={addPlaceMutation.isPending}
+            disabled={addPlaceMutation.isPending || isCheckingDuplicates}
           >
             <Text style={styles.primaryButtonText}>
-              {addPlaceMutation.isPending ? 'Submitting...' : 'Add Place'}
+              {isCheckingDuplicates
+                ? 'Checking…'
+                : addPlaceMutation.isPending
+                ? 'Submitting...'
+                : 'Add Place'}
             </Text>
           </Pressable>
         </ScrollView>

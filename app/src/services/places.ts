@@ -189,6 +189,10 @@ interface AddPlaceInput {
   // until someone moderates and backfills.
   city?: string;
   country?: string;
+  // When autocomplete was used, the Google place_id. Drives both dedup
+  // (matched against existing seeded rows via places.sources) and the
+  // provenance record we write on insert.
+  google_place_id?: string;
 }
 
 /**
@@ -207,6 +211,23 @@ export async function addPlace(input: AddPlaceInput, userId: string): Promise<Pl
     city: input.city ? sanitizeText(input.city) : undefined,
     country: input.country ? sanitizeText(input.country) : undefined,
   };
+  // Strip the synthetic field before insert — it's not a column.
+  delete (sanitized as { google_place_id?: string }).google_place_id;
+
+  // Always write a sources record so future dedup logic has something
+  // to match against. Autocomplete submissions inherit Google's place_id;
+  // manual submissions are tagged user_contribution with the user_id.
+  const sourceRecord = input.google_place_id
+    ? {
+        source: 'google_places',
+        source_id: input.google_place_id,
+        imported_at: new Date().toISOString(),
+      }
+    : {
+        source: 'user_contribution',
+        source_id: userId,
+        imported_at: new Date().toISOString(),
+      };
 
   const { data, error } = await supabase
     .from('places')
@@ -222,6 +243,7 @@ export async function addPlace(input: AddPlaceInput, userId: string): Promise<Pl
       not_halal_reports: 0,
       is_featured: false,
       featured_tier: null,
+      sources: [sourceRecord],
     })
     .select()
     .single();
@@ -232,6 +254,61 @@ export async function addPlace(input: AddPlaceInput, userId: string): Promise<Pl
   await supabase.rpc('award_points', { user_id: userId, amount: 50 });
 
   return data as Place;
+}
+
+/**
+ * Check whether a place matching the given Google place_id or close to the
+ * given coordinates already exists. Used by the Add Place flow to surface
+ * "this place is already on HalalNomad" before a duplicate row lands.
+ *
+ * Two-layer match, in order:
+ *   1. By Google place_id (catches autocomplete picks that map to seeded
+ *      rows or earlier user adds — most common case).
+ *   2. By coordinates within 50 m (catches manual submissions and any
+ *      autocomplete pick whose place_id didn't tie back to anything).
+ *
+ * Returns the first match found, or null if either layer fails or
+ * matches nothing. A network failure here is treated as "no match" — we
+ * don't want to block submission on a dedup-check error.
+ */
+export async function findExistingPlace(opts: {
+  googlePlaceId?: string;
+  lat?: number;
+  lng?: number;
+}): Promise<Place | null> {
+  if (opts.googlePlaceId) {
+    try {
+      const { data, error } = await supabase
+        .from('places')
+        .select('*')
+        .eq('is_active', true)
+        .contains('sources', [{ source_id: opts.googlePlaceId }])
+        .limit(1);
+      if (!error && data && data.length > 0) return data[0] as Place;
+    } catch {
+      // fall through to coord-based check
+    }
+  }
+
+  if (opts.lat != null && opts.lng != null) {
+    try {
+      const { data, error } = await supabase.rpc('nearby_places', {
+        lat: opts.lat,
+        lng: opts.lng,
+        radius_km: 0.05,
+      });
+      if (!error && data && data.length > 0) {
+        // Filter to active places — nearby_places already filters, but
+        // be defensive in case its definition changes.
+        const active = (data as Place[]).filter((p) => p.is_active);
+        if (active.length > 0) return active[0];
+      }
+    } catch {
+      // swallow; caller treats null as "no match found"
+    }
+  }
+
+  return null;
 }
 
 /**
