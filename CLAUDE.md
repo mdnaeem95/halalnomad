@@ -109,7 +109,8 @@ halal/
 │   │   ├── hooks/                   # React hooks (useAuth, usePlaces, etc.)
 │   │   ├── lib/                     # Libs: supabase, rc, sentry, analytics,
 │   │   │                            # notifications, i18n setup, migrations
-│   │   ├── services/                # Business logic (places, map providers)
+│   │   ├── services/                # Business logic (places, map providers,
+│   │   │                            # google-places autocomplete wrapper)
 │   │   ├── stores/                  # Zustand stores (app-store)
 │   │   ├── constants/theme.ts       # Colors, typography, spacing, shadows
 │   │   ├── i18n/locales/            # en, ms, ar, tr
@@ -280,6 +281,13 @@ Numbered sequentially in `app/src/lib/migration-*.sql`. Current set:
   `scripts/seed/cities.py`). Backfills existing staging rows. Promote
   RPC now prefers `staging.country` and falls back to the VALUES
   lookup only for legacy rows
+- `014` — creates the missing `photos` storage bucket (public read,
+  5 MB cap, JPEG/PNG/WEBP only) plus three RLS policies on
+  `storage.objects` (public SELECT, authed INSERT to own folder,
+  authed DELETE own). The bucket was referenced by `services/places.ts
+  → uploadPhoto` since v1 but was never created in production — every
+  photo-attached submission failed with "Bucket not found" until this
+  landed
 
 **Run them manually in Supabase SQL Editor.** No migration runner yet.
 When adding a new one, keep the number sequence and document the
@@ -295,7 +303,9 @@ strings to `track()`. New events go in the enum first.
 - `app/.env` is gitignored but uploaded to EAS Build. Holds
   `EXPO_PUBLIC_SUPABASE_URL`, `EXPO_PUBLIC_SUPABASE_ANON_KEY`,
   `EXPO_PUBLIC_SENTRY_DSN`, `EXPO_PUBLIC_POSTHOG_API_KEY`,
-  `EXPO_PUBLIC_REVENUECAT_IOS_KEY`, `EXPO_PUBLIC_REVENUECAT_ANDROID_KEY`.
+  `EXPO_PUBLIC_REVENUECAT_IOS_KEY`, `EXPO_PUBLIC_REVENUECAT_ANDROID_KEY`,
+  `EXPO_PUBLIC_GOOGLE_MAPS_API_KEY` (used by `services/google-places.ts`
+  for the Add Place autocomplete; same key as the native map SDK).
 - Critical `EXPO_PUBLIC_*` vars are also duplicated as EAS environment
   variables (for production builds): `npx eas-cli env:list production`
   to audit.
@@ -352,6 +362,34 @@ at level 4, but Google Places never does.
 - **First-launch verifications race.** `useUserVerifications` returns
   `hasConfirmed: false` during initial load — cooldowns + the DB
   `UNIQUE` constraint backstop the window.
+- **Metro / babel-preset-expo transform cache pins stale env values.**
+  When you change an `EXPO_PUBLIC_*` var (e.g. swapping a RevenueCat
+  key) and immediately `eas update`, the inlined value can carry over
+  from a previous bundle because babel caches the env substitution.
+  Symptom: bundle hash doesn't change between consecutive publishes.
+  Fix: `rm -rf "$TMPDIR/metro-cache"` and rebuild. We were burned by
+  this twice (RC key + sourcemaps) — bake the cache wipe into any
+  env-change-related OTA.
+- **`eas update --platform all` requires `react-native-web`.** Expo's
+  export step bundles all platforms declared in `expo.platforms`. If
+  web is in there but `react-native-web` isn't installed, the entire
+  update fails before either iOS or Android lands. Workaround: publish
+  iOS and Android in two separate commands until web support is real.
+- **`fetch(uri).blob()` returns 0 bytes for local `file://` URIs on
+  iOS.** Known React Native polyfill quirk. The upload to Supabase
+  Storage "succeeds" but the file is empty (verify with
+  `curl -I` → `content-length: 0`, etag = MD5 of empty string). Always
+  upload images via `expo-file-system.readAsStringAsync(uri, { encoding:
+  'base64' })` → decode to `Uint8Array` → upload that. See
+  `services/places.ts → uploadPhoto`.
+- **TikTok / Instagram keyword-search deep links drop the `?q=` query.**
+  Universal-link search URLs reliably open the native app but the OS
+  hands off to a generic search/explore landing without the query.
+  Only hashtag URLs (`/tag/<x>` on TikTok, `/explore/tags/<x>/` on IG)
+  carry their content intact. The Add Place external-lookup row routes
+  to `halal<city>` hashtags + copies the place name to clipboard with
+  a confirm dialog as the paste hint. Don't waste a session trying to
+  make keyword search "just work."
 
 ## When reviewing proposed features
 

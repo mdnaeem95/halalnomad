@@ -122,3 +122,53 @@ watch reviewers hit old code. The release script exists specifically to
 make this one command. If you do anything manual, the mnemonic is:
 
 > **Every production build gets an OTA. Every single time.**
+
+## Operational gotchas (lessons paid for)
+
+These caught us once each and shouldn't again:
+
+### Metro cache pins stale `EXPO_PUBLIC_*` values
+
+When you change an `EXPO_PUBLIC_*` env var (e.g. swapping a RevenueCat
+key from `test_` to `goog_`) and immediately `eas update`, the inlined
+value can carry over from a previous bundle. Cause: `babel-preset-expo`
+caches the env-var substitution in `$TMPDIR/metro-cache` and Metro's
+content hashing doesn't notice the env change. Symptom: bundle hash
+doesn't change between consecutive publishes; the OTA gets shipped but
+contains the old key.
+
+**Fix before the OTA, whenever an env var changed:**
+
+```bash
+rm -rf "$TMPDIR/metro-cache" "$TMPDIR/metro-file-map-"*
+rm -rf dist/
+npx eas-cli update --branch production --platform <ios|android> --message "…"
+```
+
+Then verify the change actually landed by `strings dist/_expo/static/js/<plat>/index-*.hbc | grep <expected-value>`.
+
+### `--platform all` requires `react-native-web`
+
+`eas update --platform all` tells Expo's export step to bundle every
+platform declared in `expo.platforms` — which (by default) includes
+web. If `react-native-web` isn't installed (it isn't in our setup), the
+whole publish aborts before either mobile platform lands.
+
+Until web support is real, **publish iOS and Android in two separate
+commands**:
+
+```bash
+CI=1 npx eas-cli update --branch production --platform ios --message "…"
+CI=1 npx eas-cli update --branch production --platform android --message "…"
+```
+
+(The `CI=1` env hint replaces the deprecated `--non-interactive` flag —
+eas-cli logs a warning if you use the old one.)
+
+### Three OTAs ≠ three releases
+
+EAS Update auto-serves the **latest** update group on a runtime; older
+ones become unreachable. We had a stretch where a single bad-bundle bug
+got published 3× in a row (RC key episode) — devices only ever saw the
+last one. Don't waste mental energy on the bad publishes. The fix is
+the last successful update group, full stop.

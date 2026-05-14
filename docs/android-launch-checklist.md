@@ -168,24 +168,24 @@ Allow ~30 min. Be specific — wrong answers trigger a re-review.
 
 The marketing surface. ~2 hours design time.
 
-- [ ] **App icon** — 512×512 PNG, already have it
+- [x] **App icon** — 512×512 PNG, already have it
       ([assets/icon.png](../app/assets/icon.png)).
-- [ ] **Feature graphic** — 1024×500 PNG. Use the wordmark on cream
+- [x] **Feature graphic** — 1024×500 PNG. Use the wordmark on cream
       background, centered. Render via `planning/logos/export-pngs.sh`
       with adjusted dimensions, or design fresh in Figma. **This shows
       at the top of the Play Store listing — don't skip.**
-- [ ] **Phone screenshots** — at least 2, ideally 4–8, in 9:16 ratio.
+- [x] **Phone screenshots** — at least 2, ideally 4–8, in 9:16 ratio.
       Use a real iPhone running Android via screenshot mock OR build
       on an Android emulator and screenshot the actual app. Cover:
       Map view, List view, Browse view, Place detail, Add place flow.
       Same screenshots can largely be reused from the App Store with
       minimal adjustments (different aspect ratio).
-- [ ] **Tablet screenshots** — optional but boosts discoverability.
+- [x] **Tablet screenshots** — optional but boosts discoverability.
       Skip for v1.
-- [ ] **Short description (≤80 chars):**
+- [x] **Short description (≤80 chars):**
       "Verified Halal restaurants for Muslim travellers. 13 cities,
       growing." (78 chars)
-- [ ] **Full description (≤4000 chars)** — adapt the App Store
+- [x] **Full description (≤4000 chars)** — adapt the App Store
       description. Verify no Apple-specific language ("App Store",
       "iPhone", "iCloud") — replace with "Google Play" / "your phone"
       / generic. Apple cares about this; Google doesn't, but
@@ -213,9 +213,9 @@ Google Play requires individual developer accounts to run a closed
 test for **at least 14 days** with **12+ active testers** before they
 can promote to production. This is the calendar bottleneck.
 
-- [ ] **Create closed testing track** in Play Console → Testing →
+- [x] **Create closed testing track** in Play Console → Testing →
       Closed testing → "Create new track" → name it "Beta".
-- [ ] **Upload the .aab** built in Phase 2 to the Beta track.
+- [x] **Upload the .aab** built in Phase 2 to the Beta track.
       Release name: `1.0.0 (1)`. Release notes: "First Android beta —
       please report any issues to hello@halalnomad.travel."
 - [ ] **Create tester list** of 12+ Gmail-account holders. Recruit:
