@@ -1,4 +1,7 @@
-import * as FileSystem from 'expo-file-system';
+// expo-file-system v19 rewrote the public API; readAsStringAsync +
+// EncodingType moved behind /legacy. Don't drop the suffix or
+// FileSystem.EncodingType becomes undefined at runtime.
+import * as FileSystem from 'expo-file-system/legacy';
 import { supabase } from '../lib/supabase';
 import { sanitizeText, sanitizeMultiline } from '../lib/sanitize';
 import {
