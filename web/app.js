@@ -56,7 +56,7 @@
       });
 
       if (response.status === 201 || response.ok) {
-        setStatus("You're on the list. We'll email when we go live — single message, no newsletter.", 'success');
+        setStatus("You're on the list. We'll email when Android lands on Google Play — single message, no newsletter.", 'success');
         input.value = '';
         return;
       }
