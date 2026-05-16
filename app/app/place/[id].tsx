@@ -46,13 +46,30 @@ import { EVENTS, track } from '../../src/lib/analytics';
 
 // Trust-level explainer copy, surfaced inline on the "How we know" card.
 // Mirrors the launch-posts trust carousel so the in-app and marketing
-// language stay aligned.
-const TRUST_LEVEL_EXPLAINER: Record<HalalLevel, string> = {
-  1: 'Reported by a traveller. Needs 3 community confirmations to upgrade.',
-  2: 'Confirmed by 3+ travellers as Halal. Recommended to verify on arrival.',
-  3: 'A traveller uploaded a Halal certificate or Halal-only menu photo.',
-  4: 'Certified by an official Halal authority.',
-};
+// language stay aligned. Dynamic for level 1 / 2 so the count reflects
+// real progress toward the next tier rather than a stale "needs 3."
+function trustLevelExplainer(level: HalalLevel, verificationCount: number): string {
+  const count = Math.max(0, verificationCount);
+  switch (level) {
+    case 1: {
+      const remaining = Math.max(0, 3 - count);
+      if (count === 0) {
+        return 'Reported by a traveller. Needs 3 community confirmations to upgrade to Community Verified.';
+      }
+      if (remaining === 0) {
+        // Race window — trigger hasn't promoted yet but count is there.
+        return 'Has 3 community confirmations — upgrading to Community Verified shortly.';
+      }
+      return `Confirmed by ${count} ${count === 1 ? 'traveller' : 'travellers'} so far. ${remaining} more confirmation${remaining === 1 ? '' : 's'} to upgrade to Community Verified.`;
+    }
+    case 2:
+      return `Confirmed by ${count} ${count === 1 ? 'traveller' : 'travellers'} as Halal. Recommended to verify on arrival.`;
+    case 3:
+      return 'A traveller uploaded a Halal certificate or Halal-only menu photo.';
+    case 4:
+      return 'Certified by an official Halal authority.';
+  }
+}
 
 type ExternalPlatform = 'tiktok' | 'instagram';
 
@@ -458,7 +475,7 @@ export default function PlaceDetailScreen() {
               {HALAL_LEVEL_LABELS[place.halal_level]}
             </Text>
             <Text style={[styles.howWeKnowExplainer, { color: c.textSecondary }]}>
-              {TRUST_LEVEL_EXPLAINER[place.halal_level]}
+              {trustLevelExplainer(place.halal_level, place.verification_count)}
             </Text>
           </View>
         </View>
