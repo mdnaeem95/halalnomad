@@ -23,6 +23,7 @@ from rich import print
 from rich.table import Table
 
 from db import seed_user_id, supa
+import posthog_client as ph
 
 app = typer.Typer(add_completion=False, no_args_is_help=True)
 
@@ -82,6 +83,7 @@ def cmd_run(
         return
 
     print(f"[bold]{len(rows)} row(s) ready to promote[/]")
+    ph.capture("promote_run_started", {"city": city, "eligible_count": len(rows), "dry_run": dry_run})
 
     if dry_run:
         for r in rows[:25]:
@@ -103,7 +105,9 @@ def cmd_run(
                 succeeded += 1
         except Exception as e:
             failed.append((r["name_en"], str(e)))
+            ph.capture("place_promote_failed", {"city": r.get("city"), "error": str(e)})
 
+    ph.capture("promote_run_completed", {"city": city, "succeeded": succeeded, "failed": len(failed), "total": len(rows)})
     print(f"[green]✓ Promoted {succeeded} of {len(rows)}.[/]")
     if failed:
         print(f"[red]✗ {len(failed)} failed:[/]")

@@ -26,6 +26,7 @@ from rich import print
 from rich.table import Table
 
 from db import supa
+import posthog_client as ph
 
 app = typer.Typer(add_completion=False, no_args_is_help=True)
 
@@ -186,6 +187,8 @@ def cmd_auto_approve(
     for r in matches[:10]:
         print(f"  • [{r['cuisine_type']}] {r['name_en']}")
 
+    ph.capture("auto_approve_run", {"city": city, "match_count": len(matches), "dry_run": dry_run})
+
     if dry_run:
         print("[yellow]Dry run — no writes.[/]")
         return
@@ -218,6 +221,7 @@ def cmd_auto_reject(
     pat = re.compile(REJECT_NAME_REGEX, re.IGNORECASE)
     matches = [r for r in rows if pat.search(r["name_en"] or "")]
     print(f"[bold]Auto-reject: {len(matches)} pending rows match the chain blacklist.[/]")
+    ph.capture("auto_reject_run", {"city": city, "match_count": len(matches), "dry_run": dry_run})
     if not matches:
         return
 

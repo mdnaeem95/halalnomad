@@ -39,6 +39,7 @@ from rich.table import Table
 
 from cities import DEFAULT_RADIUS_M, District, get_country, get_districts, list_cities
 from db import google_api_key, supa
+import posthog_client as ph
 
 app = typer.Typer(add_completion=False, no_args_is_help=True)
 
@@ -324,6 +325,7 @@ def cmd_scrape(
         districts = districts[:max_districts]
 
     print(f"[bold]Scraping {city}[/] — {len(districts)} districts")
+    ph.capture("scrape_started", {"city": city, "district_count": len(districts), "dry_run": dry_run})
 
     summary = {
         "fetched": 0,
@@ -347,6 +349,8 @@ def cmd_scrape(
                 nearby = nearby_search(client, district)
             except Exception as e:
                 print(f"[red]  ! {district.name}: {e}[/]")
+                ph.capture("district_scrape_failed", {"city": city, "district": district.name, "error": str(e)})
+                ph.capture_exception(e)
                 progress.remove_task(task)
                 continue
 
@@ -371,6 +375,7 @@ def cmd_scrape(
                     details = fetch_details(client, nr.place_id)
                 except Exception as e:
                     print(f"[yellow]  ~ details failed for {nr.name}: {e}[/]")
+                    ph.capture("place_details_failed", {"city": city, "district": district.name, "error": str(e)})
                     summary["details_skipped"] += 1
                     details = None
 
@@ -386,6 +391,8 @@ def cmd_scrape(
     for k, v in summary.items():
         table.add_row(k, str(v))
     print(table)
+
+    ph.capture("scrape_completed", {"city": city, "dry_run": dry_run, **summary})
 
     if dry_run:
         print("[yellow]Dry run — not writing to staging.[/]")
@@ -405,6 +412,7 @@ def cmd_scrape(
             chunk, on_conflict="source,source_id", ignore_duplicates=True
         ).execute()
         inserted += len(chunk)
+    ph.capture("places_staged", {"city": city, "inserted_count": inserted})
     print(f"[green]✓ Upserted {inserted} rows into places_staging.[/]")
     print(f"  Review in Supabase Studio:")
     print(f"  SELECT * FROM places_staging WHERE city = '{city}' AND reviewed = false;")
