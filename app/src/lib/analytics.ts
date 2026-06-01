@@ -6,11 +6,23 @@ const POSTHOG_API_KEY = process.env.EXPO_PUBLIC_POSTHOG_API_KEY;
  * PostHog analytics instance.
  * Privacy-friendly, open-source analytics. No PII collected.
  */
+// The PostHog project lives on EU Cloud (project 191007) and the EU API
+// key in .env must hit the matching EU ingest host. The SDK's built-in
+// default region is US — so an SDK upgrade, a codemod, or a re-run of the
+// PostHog setup wizard could silently drop this option and route events to
+// the wrong region (a bug we already shipped once: events vanished from the
+// EU dashboard). POSTHOG_HOST + POSTHOG_OPTIONS are a single source of truth
+// asserted in analytics-host.test.ts, which runs in CI — keep them wired
+// into the constructor so the regression can't land again unnoticed.
+export const POSTHOG_HOST = 'https://eu.i.posthog.com';
+
+export const POSTHOG_OPTIONS = {
+  host: POSTHOG_HOST,
+  captureAppLifecycleEvents: true,
+} as const;
+
 export const posthog = POSTHOG_API_KEY
-  ? new PostHog(POSTHOG_API_KEY, {
-      host: 'https://eu.i.posthog.com', // EU Cloud (project 191007) — must match the EU API key in .env
-      captureAppLifecycleEvents: true,
-    })
+  ? new PostHog(POSTHOG_API_KEY, POSTHOG_OPTIONS)
   : null;
 
 // ============================================
