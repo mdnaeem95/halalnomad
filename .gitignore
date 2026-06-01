@@ -5,3 +5,7 @@
 
 # Supabase CLI cache
 supabase/.temp/
+.env
+
+# Local Claude Code tooling (wizard skills, session config)
+.claude/
