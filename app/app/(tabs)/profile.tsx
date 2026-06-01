@@ -303,11 +303,11 @@ export default function ProfileScreen() {
 
       {/* Legal links */}
       <View style={styles.legalLinks}>
-        <Pressable onPress={() => Linking.openURL('https://mdnaeem95.github.io/halalnomad/terms')}>
+        <Pressable onPress={() => Linking.openURL('https://halalnomad.travel/terms')}>
           <Text style={styles.legalLink}>Terms of Service</Text>
         </Pressable>
         <Text style={styles.legalDot}>·</Text>
-        <Pressable onPress={() => Linking.openURL('https://mdnaeem95.github.io/halalnomad/privacy')}>
+        <Pressable onPress={() => Linking.openURL('https://halalnomad.travel/privacy')}>
           <Text style={styles.legalLink}>Privacy Policy</Text>
         </Pressable>
       </View>

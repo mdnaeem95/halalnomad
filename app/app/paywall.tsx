@@ -226,11 +226,11 @@ export default function PaywallScreen() {
         </Text>
 
         <View style={styles.legalLinks}>
-          <Pressable onPress={() => Linking.openURL('https://mdnaeem95.github.io/halalnomad/terms')}>
+          <Pressable onPress={() => Linking.openURL('https://halalnomad.travel/terms')}>
             <Text style={[styles.legalLink, { color: c.primary }]}>Terms of Service</Text>
           </Pressable>
           <Text style={[styles.legalDot, { color: c.textTertiary }]}>·</Text>
-          <Pressable onPress={() => Linking.openURL('https://mdnaeem95.github.io/halalnomad/privacy')}>
+          <Pressable onPress={() => Linking.openURL('https://halalnomad.travel/privacy')}>
             <Text style={[styles.legalLink, { color: c.primary }]}>Privacy Policy</Text>
           </Pressable>
         </View>

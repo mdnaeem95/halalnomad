@@ -8,7 +8,7 @@ const POSTHOG_API_KEY = process.env.EXPO_PUBLIC_POSTHOG_API_KEY;
  */
 export const posthog = POSTHOG_API_KEY
   ? new PostHog(POSTHOG_API_KEY, {
-      host: 'https://us.i.posthog.com',
+      host: 'https://eu.i.posthog.com', // EU Cloud (project 191007) — must match the EU API key in .env
       captureAppLifecycleEvents: true,
     })
   : null;
