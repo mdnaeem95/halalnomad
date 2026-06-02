@@ -3,6 +3,7 @@
 // FileSystem.EncodingType becomes undefined at runtime.
 import * as FileSystem from 'expo-file-system/legacy';
 import { supabase } from '../lib/supabase';
+import { captureError } from '../lib/sentry';
 import { sanitizeText, sanitizeMultiline } from '../lib/sanitize';
 import {
   CityCount,
@@ -235,7 +236,7 @@ export async function addPlace(input: AddPlaceInput, userId: string): Promise<Pl
   if (error) throw error;
 
   // Award points for adding a place
-  await supabase.rpc('award_points', { user_id: userId, amount: 50 });
+  await awardPoints(userId, 50);
 
   return data as Place;
 }
@@ -332,17 +333,33 @@ export async function verifyPlace(
 
   if (error) throw error;
 
-  // Update verification count and halal level
+  // Update verification count and halal level. The count/report RPCs are
+  // core data integrity — a failure must surface (a swallowed RLS error on
+  // increment_verification dropped 19 confirms before migration-018), so
+  // throw. award_points is secondary and must never block a verification,
+  // so capture it but don't throw.
   if (type === 'confirm') {
-    await supabase.rpc('increment_verification', { p_place_id: placeId });
-    await supabase.rpc('award_points', { user_id: userId, amount: 15 });
+    const { error } = await supabase.rpc('increment_verification', { p_place_id: placeId });
+    if (error) throw error;
+    await awardPoints(userId, 15);
   } else if (type === 'certificate') {
-    await supabase.rpc('award_points', { user_id: userId, amount: 30 });
+    await awardPoints(userId, 30);
   } else {
     // flag_closed or flag_not_halal
-    await supabase.rpc('increment_report_count', { p_place_id: placeId, p_type: type });
-    await supabase.rpc('award_points', { user_id: userId, amount: 10 });
+    const { error } = await supabase.rpc('increment_report_count', { p_place_id: placeId, p_type: type });
+    if (error) throw error;
+    await awardPoints(userId, 10);
   }
+}
+
+/**
+ * Award points without letting a failure block the calling action. Points
+ * are non-critical, and award_points is SECURITY INVOKER (RLS-limited to
+ * self-awards), so failures are surfaced to Sentry rather than thrown.
+ */
+async function awardPoints(userId: string, amount: number): Promise<void> {
+  const { error } = await supabase.rpc('award_points', { user_id: userId, amount });
+  if (error) captureError(error, { rpc: 'award_points', userId, amount: String(amount) });
 }
 
 /**
@@ -385,7 +402,7 @@ export async function addReview(
   });
 
   if (error) throw error;
-  await supabase.rpc('award_points', { user_id: userId, amount: 20 });
+  await awardPoints(userId, 20);
 }
 
 /**
