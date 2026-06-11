@@ -43,6 +43,8 @@ import {
 } from '../../src/constants/theme';
 import { FEATURES } from '../../src/constants/features';
 import { EVENTS, track } from '../../src/lib/analytics';
+import { normalizePlaceSource } from '../../src/lib/navigation';
+import { useAppStore } from '../../src/stores/app-store';
 
 // Trust-level explainer copy, surfaced inline on the "How we know" card.
 // Mirrors the launch-posts trust carousel so the in-app and marketing
@@ -101,9 +103,10 @@ function buildExternalSearchUrl(platform: ExternalPlatform, place: Place): strin
 }
 
 export default function PlaceDetailScreen() {
-  const { id } = useLocalSearchParams<{ id: string }>();
+  const { id, from } = useLocalSearchParams<{ id: string; from?: string }>();
   const { user, refreshProfile } = useAuth();
   const { location } = useLocation();
+  const consumePlaceView = useAppStore((s) => s.consumePlaceView);
 
   const { data: place, isLoading: placeLoading } = usePlace(id);
   const { data: reviews = [] } = useReviews(id ?? '');
@@ -119,6 +122,26 @@ export default function PlaceDetailScreen() {
   const { isOnCooldown: verifyOnCooldown, trigger: triggerVerify } = useCooldown(5000);
   const { isOnCooldown: reportOnCooldown, trigger: triggerReport } = useCooldown(5000);
   const [reviewModalVisible, setReviewModalVisible] = useState(false);
+
+  // place_viewed: fire once per resolved place (keyed on place.id so a
+  // background refetch doesn't re-fire). is_first_view_of_session + the
+  // time-to-first-view are read from the per-session store; the timing is
+  // only meaningful on the first view, so it's omitted on later views.
+  React.useEffect(() => {
+    if (!place) return;
+    const { isFirstOfSession, secondsSinceStart } = consumePlaceView();
+    track(EVENTS.PLACE_VIEWED, {
+      place_id: place.id,
+      city: place.city ?? null,
+      halal_level: place.halal_level,
+      source_screen: normalizePlaceSource(from),
+      is_first_view_of_session: isFirstOfSession,
+      ...(isFirstOfSession && secondsSinceStart != null
+        ? { time_to_first_view_seconds: secondsSinceStart }
+        : {}),
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [place?.id]);
 
   // One review per user per place — DB-enforced via UNIQUE(place_id, user_id).
   // Use the already-fetched review list to show the right CTA without an
@@ -264,6 +287,15 @@ export default function PlaceDetailScreen() {
       latitude: place.latitude,
       longitude: place.longitude,
     });
+    // handoff_target is always google_maps under the current single-provider
+    // setup (the provider hardcodes Google; Apple Maps is only an internal
+    // openURL .catch fallback we can't observe). Kept as a property so the
+    // dimension is ready if/when a provider picker lands.
+    track(EVENTS.PLACE_DIRECTIONS, {
+      place_id: place.id,
+      city: place.city ?? null,
+      handoff_target: 'google_maps',
+    });
   }
 
   async function handleCopyAddress() {
@@ -273,6 +305,13 @@ export default function PlaceDetailScreen() {
       ? `${place.address_en}\n${place.address_local}`
       : place.address_en;
     await Clipboard.setStringAsync(address);
+    // One physical tap copies the combined en+local string. Per spec we
+    // dual-fire (don't dedup): 'en' always, plus 'local' when a local
+    // address is present — so the copy of each script is counted.
+    track(EVENTS.PLACE_ADDRESS_COPIED, { place_id: place.id, address_type: 'en' });
+    if (place.address_local) {
+      track(EVENTS.PLACE_ADDRESS_COPIED, { place_id: place.id, address_type: 'local' });
+    }
     showToast('Address copied to clipboard', 'info');
   }
 

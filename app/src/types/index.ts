@@ -233,6 +233,15 @@ export interface UserProfile {
   tier: ContributorTier;
   created_at: string;
   notifications_enabled: boolean;
+  last_active_at: string | null;
+  // Engagement counters maintained server-side (migration 021). Used to
+  // populate the PostHog person profile on identify / people-properties.
+  total_verifications: number;
+  total_reviews: number;
+  total_places_added: number;
+  cities_contributed: number;
+  total_sessions: number;
+  total_days_active: number;
 }
 
 export interface SavedList {

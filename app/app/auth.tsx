@@ -18,8 +18,14 @@ import { signInSchema, signUpSchema, SignInInput, SignUpInput } from '../src/lib
 import { AppDialog } from '../src/components/AppDialog';
 import { AppColors, borderRadius, spacing, typography } from '../src/constants/theme';
 import { track, EVENTS } from '../src/lib/analytics';
+import i18n from '../src/i18n';
 
 type Mode = 'signin' | 'signup' | 'verify';
+
+// Only email auth exists in the UI today. 'oauth' / 'anonymous' are in the
+// property contract for when those land — keep this the single source so
+// the values stay consistent if/when more methods appear.
+const AUTH_METHOD = 'email' as const;
 
 export default function AuthScreen() {
   const { signIn, signUp } = useAuth();
@@ -68,6 +74,7 @@ export default function AuthScreen() {
     setIsLoading(true);
     try {
       await signIn(data.email, data.password);
+      track(EVENTS.SIGN_IN_COMPLETED, { method: AUTH_METHOD });
       router.back();
     } catch (err: any) {
       showDialog('error', 'Sign in failed', err.message || 'Invalid email or password.');
@@ -78,8 +85,15 @@ export default function AuthScreen() {
 
   async function onSignUp(data: SignUpInput) {
     setIsLoading(true);
+    track(EVENTS.SIGN_UP_STARTED, { method: AUTH_METHOD });
     try {
       await signUp(data.email, data.password, data.displayName);
+      // Email signup creates NO session until the user taps the verify link,
+      // so identify/alias can't run here — they fire in useAuth's
+      // onAuthStateChange once the verified sign-in produces a session. This
+      // is a funnel marker only; it lands on the anon distinct_id, which the
+      // later alias merges into the user.
+      track(EVENTS.SIGN_UP_COMPLETED, { method: AUTH_METHOD, language: i18n.language });
       setVerifyEmail(data.email);
       setVerifyPassword(data.password);
       setMode('verify');
@@ -94,6 +108,7 @@ export default function AuthScreen() {
     setIsLoading(true);
     try {
       await signIn(verifyEmail, verifyPassword);
+      track(EVENTS.SIGN_IN_COMPLETED, { method: AUTH_METHOD });
       router.back();
     } catch {
       showDialog(

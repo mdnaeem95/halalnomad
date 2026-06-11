@@ -20,6 +20,8 @@ import { useNearbyPlaces } from '../../src/hooks/usePlaces';
 import { useTheme } from '../../src/hooks/useTheme';
 import { useAppStore } from '../../src/stores/app-store';
 import { Place } from '../../src/types';
+import { placeHref } from '../../src/lib/navigation';
+import { track, EVENTS } from '../../src/lib/analytics';
 import { PlaceCard } from '../../src/components/PlaceCard';
 import { PlaceCardCompact } from '../../src/components/PlaceCardCompact';
 import { MapPin } from '../../src/components/MapPin';
@@ -87,7 +89,9 @@ export default function ExploreScreen() {
   const carouselRef = useRef<FlatList<Place>>(null);
 
   function handlePlacePress(place: Place) {
-    router.push(`/place/${place.id}`);
+    // One handler serves both the map carousel and the list — attribute by
+    // the active view mode (browse mode renders BrowseView, not this list).
+    router.push(placeHref(place.id, viewMode === 'list' ? 'explore_list' : 'explore_map'));
   }
 
   function handleMarkerPress(place: Place) {
@@ -103,6 +107,9 @@ export default function ExploreScreen() {
   }
 
   function handleToggle(mode: 'map' | 'list' | 'browse') {
+    if (mode !== viewMode) {
+      track(EVENTS.VIEW_MODE_CHANGED, { from_mode: viewMode, to_mode: mode });
+    }
     Haptics.selectionAsync();
     setViewMode(mode);
   }

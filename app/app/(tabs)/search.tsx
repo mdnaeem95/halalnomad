@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import {
   Pressable,
   RefreshControl,
@@ -15,10 +15,12 @@ import { usePremium } from '../../src/hooks/usePremium';
 import { useTheme } from '../../src/hooks/useTheme';
 import { useAppStore } from '../../src/stores/app-store';
 import { CuisineType, CUISINE_LABELS, Place } from '../../src/types';
+import { placeHref } from '../../src/lib/navigation';
 import { PlaceCard } from '../../src/components/PlaceCard';
 import { PremiumLockBanner } from '../../src/components/PremiumGate';
 import { FEATURES } from '../../src/constants/features';
 import { PlaceListSkeleton } from '../../src/components/Skeleton';
+import { track, EVENTS } from '../../src/lib/analytics';
 import {
   AppColors,
   borderRadius,
@@ -59,13 +61,36 @@ export default function SearchScreen() {
     isRefetching,
   } = useSearchPlaces(debouncedQuery, cuisineFilter);
 
+  // search_performed: fire once per resolved (query, cuisine) once the query
+  // settles. cuisine_filter_count is 0|1 — the cuisine filter is single-select
+  // today (one chip at a time), not multi. `query` is an event property only,
+  // never a person property.
+  const lastSearchKey = useRef<string | null>(null);
+  useEffect(() => {
+    if (!hasInput || isLoading) return;
+    const key = `${debouncedQuery}|${cuisineFilter ?? ''}`;
+    if (lastSearchKey.current === key) return;
+    lastSearchKey.current = key;
+    track(EVENTS.SEARCH_PERFORMED, {
+      query: debouncedQuery,
+      cuisine_filter_count: cuisineFilter ? 1 : 0,
+      result_count: results.length,
+      is_no_results: results.length === 0,
+    });
+  }, [debouncedQuery, cuisineFilter, isLoading, results, hasInput]);
+
   function handlePlacePress(place: Place) {
-    router.push(`/place/${place.id}`);
+    router.push(placeHref(place.id, 'search'));
   }
 
   function toggleCuisine(key: CuisineType) {
+    const isRemoving = cuisineFilter === key;
     setSearchFilters({
-      cuisineType: cuisineFilter === key ? null : key,
+      cuisineType: isRemoving ? null : key,
+    });
+    track(EVENTS.CUISINE_FILTER_USED, {
+      cuisine_type: key,
+      action: isRemoving ? 'removed' : 'added',
     });
   }
 

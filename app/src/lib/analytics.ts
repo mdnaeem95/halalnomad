@@ -1,4 +1,6 @@
 import { PostHog } from 'posthog-react-native';
+import * as Application from 'expo-application';
+import i18n from '../i18n';
 
 const POSTHOG_API_KEY = process.env.EXPO_PUBLIC_POSTHOG_API_KEY;
 
@@ -24,6 +26,25 @@ export const POSTHOG_OPTIONS = {
 export const posthog = POSTHOG_API_KEY
   ? new PostHog(POSTHOG_API_KEY, POSTHOG_OPTIONS)
   : null;
+
+// App version, derived once. Mirrored in lib/session.ts (startSession also
+// asserts it) — both compute it identically.
+export const APP_VERSION =
+  Application.nativeApplicationVersion ?? Application.nativeBuildVersion ?? 'unknown';
+
+// Register the synchronously-available super-properties at module load,
+// BEFORE React mounts and startSession() runs. captureAppLifecycleEvents
+// fires "Application Opened" at SDK construction, so without this the
+// cold-start lifecycle event carries no super-props. app_version + app_language
+// are sync, so they land on even the first-ever cold start. The session
+// counters (total_sessions / is_first_session_today / days_since_install)
+// need async AsyncStorage reads and are registered in startSession(); they
+// attach to "Application Opened" from persisted super-props on every launch
+// after the first.
+posthog?.register({
+  app_version: APP_VERSION,
+  app_language: i18n.language,
+});
 
 // ============================================
 // EVENT NAMES (centralized to prevent typos)
@@ -76,19 +97,59 @@ export const EVENTS = {
   APP_RATING_ACCEPTED: 'app_rating_accepted',
 } as const;
 
+// Property values we allow on events / person / super-properties. No PII:
+// never pass email, display_name, or a raw search query as a person/super
+// property (query is event-only — see search_performed).
+export type AnalyticsProps = Record<string, string | number | boolean | null>;
+
 /**
  * Track an analytics event with optional properties.
  * No-op if PostHog is not configured (dev without API key).
  */
-export function track(event: string, properties?: Record<string, string | number | boolean>) {
-  posthog?.capture(event, properties);
+export function track(event: string, properties?: AnalyticsProps) {
+  posthog?.capture(event, properties ?? undefined);
 }
 
 /**
- * Identify a user (anonymous — only user ID, no PII).
+ * Identify a user and (optionally) set their person properties.
+ *
+ * distinct_id is the Supabase auth.users.id UUID (approved §8.2). When
+ * called while still on the pre-auth anonymous distinct_id, PostHog
+ * automatically aliases the anon id into this user — that's the identity
+ * stitch. No PII in `properties`.
  */
-export function identifyUser(userId: string) {
-  posthog?.identify(userId);
+export function identifyUser(userId: string, properties?: AnalyticsProps) {
+  posthog?.identify(userId, properties ?? undefined);
+}
+
+/**
+ * Explicitly alias the current (anonymous) distinct_id to the user id.
+ * identify() already stitches anon -> user, so this is belt-and-braces for
+ * the sign-up path where we want the mapping recorded before the first
+ * identify. posthog-react-native's alias() takes a single argument (the
+ * new id); it aliases the CURRENT distinct id to it.
+ */
+export function aliasUser(userId: string) {
+  posthog?.alias(userId);
+}
+
+/**
+ * Set person properties on the already-identified user without emitting a
+ * domain event. posthog-react-native has no people.set(); re-calling
+ * identify() with the current distinct_id sends the properties as $set.
+ */
+export function setPersonProperties(properties: AnalyticsProps) {
+  if (!posthog) return;
+  posthog.identify(posthog.getDistinctId(), properties);
+}
+
+/**
+ * Register super-properties — attached to every capture (including the
+ * SDK's autocaptured lifecycle events) until reset. Set once per session
+ * at app-open so cohort slicing works without per-call-site changes.
+ */
+export function registerSuperProperties(properties: AnalyticsProps) {
+  posthog?.register(properties);
 }
 
 /**

@@ -7,6 +7,7 @@ import { router } from 'expo-router';
 import { supabase } from '../lib/supabase';
 import { saveUserTimezone, touchLastActive } from '../lib/notifications';
 import { track, EVENTS } from '../lib/analytics';
+import { placeHref } from '../lib/navigation';
 
 const HEARTBEAT_MIN_INTERVAL_MS = 60 * 60 * 1000; // throttle to once per hour
 
@@ -76,7 +77,7 @@ function handleNotificationTap(data: Record<string, unknown> | undefined) {
   const placeId = typeof data.placeId === 'string' ? data.placeId : null;
   const screen = typeof data.screen === 'string' ? data.screen : null;
   if (placeId) {
-    router.push(`/place/${placeId}`);
+    router.push(placeHref(placeId, 'notification'));
   } else if (screen) {
     router.push(screen as never);
   }
