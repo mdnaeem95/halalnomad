@@ -236,11 +236,18 @@ export function useVerifyPlace() {
       });
 
       if (!_err) {
-        if (type === 'confirm') {
-          track(EVENTS.PLACE_VERIFIED, { placeId });
-          recordPositiveAction();
+        // Task 4: restore the 4-action distinction collapsed into 2 events.
+        // 'certificate' maps to type 'upload_cert' — coded for forward
+        // compatibility, but it has no UI path today (no cert-upload screen
+        // exists), so it won't fire until one lands.
+        if (type === 'confirm' || type === 'certificate') {
+          track(EVENTS.PLACE_VERIFIED, {
+            place_id: placeId,
+            type: type === 'certificate' ? 'upload_cert' : 'confirm',
+          });
+          if (type === 'confirm') recordPositiveAction();
         } else if (type === 'flag_closed' || type === 'flag_not_halal') {
-          track(EVENTS.PLACE_REPORTED, { placeId, reportType: type });
+          track(EVENTS.PLACE_REPORTED, { place_id: placeId, type });
         }
       }
     },

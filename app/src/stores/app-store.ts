@@ -35,6 +35,14 @@ interface AppState {
   searchFilters: SearchFilters;
   setSearchFilters: (filters: Partial<SearchFilters>) => void;
   resetSearchFilters: () => void;
+
+  // Session (in-memory, per app-open). Powers is_first_view_of_session +
+  // time_to_first_view_seconds on place_viewed. markSessionStarted is
+  // called once per Application Opened from lib/session.ts.
+  sessionStartedAt: number | null;
+  sessionHadFirstView: boolean;
+  markSessionStarted: () => void;
+  consumePlaceView: () => { isFirstOfSession: boolean; secondsSinceStart: number | null };
 }
 
 const DEFAULT_FILTERS: SearchFilters = {
@@ -43,7 +51,7 @@ const DEFAULT_FILTERS: SearchFilters = {
   priceRange: null,
 };
 
-export const useAppStore = create<AppState>((set) => ({
+export const useAppStore = create<AppState>((set, get) => ({
   colorScheme: 'system' as ColorScheme,
   setColorScheme: (scheme) => set({ colorScheme: scheme }),
 
@@ -69,4 +77,21 @@ export const useAppStore = create<AppState>((set) => ({
       searchFilters: { ...state.searchFilters, ...filters },
     })),
   resetSearchFilters: () => set({ searchFilters: DEFAULT_FILTERS }),
+
+  sessionStartedAt: null,
+  sessionHadFirstView: false,
+  markSessionStarted: () =>
+    set({ sessionStartedAt: Date.now(), sessionHadFirstView: false }),
+  consumePlaceView: () => {
+    const { sessionStartedAt, sessionHadFirstView } = get();
+    if (sessionHadFirstView) {
+      return { isFirstOfSession: false, secondsSinceStart: null };
+    }
+    set({ sessionHadFirstView: true });
+    const secondsSinceStart =
+      sessionStartedAt != null
+        ? Math.max(0, Math.round((Date.now() - sessionStartedAt) / 1000))
+        : null;
+    return { isFirstOfSession: true, secondsSinceStart };
+  },
 }));

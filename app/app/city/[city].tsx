@@ -5,6 +5,7 @@ import { Stack, useLocalSearchParams, router } from 'expo-router';
 import { usePlacesByCity } from '../../src/hooks/usePlaces';
 import { useTheme } from '../../src/hooks/useTheme';
 import { Place } from '../../src/types';
+import { placeHref } from '../../src/lib/navigation';
 import { PlaceCard } from '../../src/components/PlaceCard';
 import { AppColors, spacing, typography } from '../../src/constants/theme';
 
@@ -24,7 +25,7 @@ export default function CityScreen() {
   const { data: places, isLoading, error } = usePlacesByCity(city);
 
   function handlePlacePress(place: Place) {
-    router.push(`/place/${place.id}`);
+    router.push(placeHref(place.id, 'city_detail'));
   }
 
   return (

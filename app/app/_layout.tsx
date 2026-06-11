@@ -10,6 +10,7 @@ import { AuthProvider, useAuth } from '../src/hooks/useAuth';
 import { NetworkProvider } from '../src/hooks/useNetwork';
 import { useTheme } from '../src/hooks/useTheme';
 import { useNotifications } from '../src/hooks/useNotifications';
+import { useSessionTracking } from '../src/hooks/useSessionTracking';
 import { ErrorBoundary } from '../src/components/ErrorBoundary';
 import { OfflineBanner } from '../src/components/OfflineBanner';
 import { LoadingSplash } from '../src/components/LoadingSplash';
@@ -40,10 +41,11 @@ const AUTH_BOOT_TIMEOUT_MS = 8000;
 function AppStack() {
   const { t } = useTranslation();
   const { colors, isDark } = useTheme();
-  const { user, isLoading: authLoading } = useAuth();
+  const { user, profile, isLoading: authLoading } = useAuth();
   const [onboardingDone, setOnboardingDone] = useState<boolean | null>(null);
   const [authBootExpired, setAuthBootExpired] = useState(false);
   useNotifications(user?.id ?? null);
+  useSessionTracking(user?.id ?? null, profile);
 
   useEffect(() => {
     // Reveal the animated LoadingSplash as soon as React renders —

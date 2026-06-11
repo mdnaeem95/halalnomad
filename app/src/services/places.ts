@@ -4,6 +4,7 @@
 import * as FileSystem from 'expo-file-system/legacy';
 import { supabase } from '../lib/supabase';
 import { captureError } from '../lib/sentry';
+import { track, EVENTS } from '../lib/analytics';
 import { sanitizeText, sanitizeMultiline } from '../lib/sanitize';
 import {
   CityCount,
@@ -436,6 +437,16 @@ export async function uploadPhoto(
   });
 
   if (error) throw error;
+
+  // photo_uploaded — fired per photo on Storage-write success.
+  // - source is always 'library': only the image-library picker is wired
+  //   (add.tsx); there is no camera-capture path despite the camera icon.
+  // - place_id is intentionally omitted: in the only upload flow (add place)
+  //   photos upload BEFORE the place row exists, so there is no id yet.
+  track(EVENTS.PHOTO_UPLOADED, {
+    photo_size_kb: Math.round(bytes.length / 1024),
+    source: 'library',
+  });
 
   const { data } = supabase.storage.from('photos').getPublicUrl(fileName);
   return data.publicUrl;

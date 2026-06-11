@@ -19,6 +19,7 @@ import { useAuth } from '../../src/hooks/useAuth';
 import { useAddPlace } from '../../src/hooks/usePlaces';
 import { useLocation } from '../../src/hooks/useLocation';
 import { findExistingPlace } from '../../src/services/places';
+import { placeHref } from '../../src/lib/navigation';
 import { useTheme } from '../../src/hooks/useTheme';
 import { addPlaceSchema, AddPlaceInput } from '../../src/lib/schemas';
 import { CuisineType, CUISINE_LABELS, PriceRange, PRICE_LABELS } from '../../src/types';
@@ -192,7 +193,7 @@ export default function AddPlaceScreen() {
             style: 'primary',
             onPress: () => {
               closeDialog();
-              router.push(`/place/${existing.id}`);
+              router.push(placeHref(existing.id, 'add_dedup'));
             },
           },
           {
