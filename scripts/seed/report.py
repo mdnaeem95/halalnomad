@@ -49,6 +49,19 @@ APPROVE_NAME_REGEX = (
 )
 APPROVE_CUISINES = ("middle_eastern", "indian", "malay_indonesian", "chinese_muslim", "central_asian")
 
+# "Weak" ethnonyms — common in non-food proper nouns (Turkish Airlines,
+# Turkish Trade Office, Arab Bank) and in ambiguous venues (Turkish coffee
+# shops, a "Turkish Kedi" cat cafe). The Taipei cuisine-keyword sweep dragged
+# these in: infer_cuisine tags anything with "turkish" as middle_eastern, which
+# then auto-approves. So when the halal signal rests on one of these tokens,
+# require a co-occurring FOOD signal before auto-approving — otherwise hold the
+# row for manual review. Deliberately excludes coffee/cafe/dessert words.
+WEAK_ETHNONYM_REGEX = r"turkish|\barab\b"
+FOOD_SIGNAL_REGEX = (
+    r"restaurant|eatery|diner|bistro|grill|kebab|shawarma|doner|kofte|pita|"
+    r"kitchen|food|halal|cuisine|料理|餐廳|餐館|食堂|小吃|烤肉|牛肉麵"
+)
+
 # Non-halal chains that consistently appear in scrapes. Lowercase, regex.
 REJECT_NAME_REGEX = (
     r"mcdonald|kfc|starbucks|burger king|subway|7-?eleven|family ?mart|"
@@ -151,14 +164,35 @@ def cmd_breakdown(city: str = typer.Argument(...)) -> None:
 # ---------------------------------------------------------------------------
 
 
+def _is_auto_approvable(name: str, cuisine: str | None) -> bool:
+    """True if a pending row should auto-approve.
+
+    Base signal: an approve-cuisine bucket OR a halal name marker. But if the
+    name carries a weak ethnonym (turkish/arab) and NO food signal, hold it for
+    manual review — that's the pattern behind the false positives (Turkish
+    Airlines office, a Turkish coffee shop, a "Turkish Kedi" cat cafe).
+    """
+    import re
+
+    name = name or ""
+    has_signal = cuisine in APPROVE_CUISINES or bool(
+        re.search(APPROVE_NAME_REGEX, name, re.IGNORECASE)
+    )
+    if not has_signal:
+        return False
+    weak = re.search(WEAK_ETHNONYM_REGEX, name, re.IGNORECASE)
+    food = re.search(FOOD_SIGNAL_REGEX, name, re.IGNORECASE)
+    if weak and not food:
+        return False
+    return True
+
+
 @app.command("auto-approve")
 def cmd_auto_approve(
     city: str = typer.Argument(...),
     dry_run: bool = typer.Option(False, help="Show count without writing."),
 ) -> None:
     """Mark obviously-halal pending rows as approved."""
-    import re
-
     # One fetch of all pending rows for this city, then filter in Python.
     # (supabase-py mutates the builder chain across calls — sharing it
     # between two queries silently inherits the first query's filters.)
@@ -172,12 +206,8 @@ def cmd_auto_approve(
         .data
     )
 
-    pat = re.compile(APPROVE_NAME_REGEX, re.IGNORECASE)
     matches = [
-        r
-        for r in rows
-        if r.get("cuisine_type") in APPROVE_CUISINES
-        or pat.search(r.get("name_en") or "")
+        r for r in rows if _is_auto_approvable(r.get("name_en"), r.get("cuisine_type"))
     ]
     print(f"[bold]Auto-approve: {len(matches)} pending rows match the rules.[/]")
     if not matches:
