@@ -248,8 +248,6 @@ export interface SavedList {
   id: string;
   user_id: string;
   name: string;
-  place_ids: string[];
-  is_shared: boolean;
   created_at: string;
 }
 

@@ -131,15 +131,15 @@ The abstraction layer normalises all coordinates to WGS-84 internally and handle
                     └──────────────┘     │ created_at      │
                                         └─────────────────┘
 
-┌──────────────────┐
-│   saved_lists    │
-├──────────────────┤
-│ id               │
-│ user_id          │
-│ name             │
-│ place_ids[]      │
-│ is_shared        │
-│ created_at       │
+┌──────────────────┐         ┌────────────────────┐
+│   saved_lists    │         │ saved_list_places  │
+├──────────────────┤         ├────────────────────┤
+│ id               │◀────────│ list_id            │
+│ user_id          │         │ place_id           │
+│ name             │         │ added_at           │
+│ is_default       │         │ position           │
+│ updated_at       │         │ day_index          │
+│ created_at       │         └────────────────────┘
 └──────────────────┘
 ```
 
