@@ -2,8 +2,10 @@
 
 Strategy:
 - For each district in the city (see cities.py), run a `nearbysearch`
-  for `keyword="halal"` within DEFAULT_RADIUS_M.
-- Paginate up to 3 pages per district (Google caps at 60 results).
+  for each term in CUISINE_SEARCH_KEYWORDS ("halal" plus cuisine keywords)
+  within DEFAULT_RADIUS_M. Cuisine sweeps catch Muslim-run places that
+  don't self-tag "halal" on Google but do tag by cuisine.
+- Paginate up to 3 pages per district per keyword (Google caps at 60).
 - For each result, fetch place details to enrich (hours, phone, website).
 - Dedupe against existing places_staging rows (by source_id) AND against
   the live places table (by name+location fuzzy match).
@@ -26,6 +28,7 @@ Pricing (approx, USD):
 
 from __future__ import annotations
 
+import json
 import time
 from dataclasses import dataclass, field
 from typing import Any
@@ -68,6 +71,30 @@ def _get(client: httpx.Client, url: str, params: dict[str, Any]) -> dict[str, An
 # --- Search -----------------------------------------------------------------
 
 
+# Search keywords swept per district, layered on top of the base "halal"
+# search. Many Muslim-run places (especially in Taiwan, where halal awareness
+# on Google is thin) don't self-tag "halal" — they tag by cuisine. Each term
+# runs its own nearby_search per district; in-batch dedup (seen_place_ids)
+# collapses the overlap, so the marginal cost is only the places a cuisine
+# sweep surfaces that the halal sweep missed.
+#
+# NOTE: these are SEARCH terms, not new taxonomy. Every result still classifies
+# into an EXISTING CuisineType via infer_cuisine — we deliberately did not add
+# new cuisine enum values (Turkish→middle_eastern, Uyghur→central_asian,
+# Malay/Indonesian→malay_indonesian, Indian Muslim→indian), so the app's
+# CUISINE_LABELS enum and existing seeded data stay stable.
+CUISINE_SEARCH_KEYWORDS: list[str] = [
+    "halal",          # base sweep (kept first so it wins in-batch dedup)
+    "indonesian",
+    "malay",
+    "pakistani",      # replaced "indian muslim" (0 yield in Taipei — Google
+    "north indian",   # matches the literal phrase). Bare "indian" pulls in
+                      # too much non-halal, so we target the halal-leaning subsets.
+    "turkish",
+    "uyghur",
+]
+
+
 @dataclass
 class NearbyResult:
     place_id: str
@@ -78,6 +105,7 @@ class NearbyResult:
     types: list[str] = field(default_factory=list)
     price_level: int | None = None
     raw: dict[str, Any] = field(default_factory=dict)
+    search_keyword: str = "halal"  # which sweep surfaced this result
 
 
 def nearby_search(
@@ -114,6 +142,7 @@ def nearby_search(
                     types=r.get("types", []),
                     price_level=r.get("price_level"),
                     raw=r,
+                    search_keyword=keyword,
                 )
             )
 
@@ -245,6 +274,27 @@ def already_staged(client: httpx.Client, place_id: str) -> bool:
     return len(res.data) > 0
 
 
+def already_promoted(place_id: str) -> bool:
+    """Has this exact Google place_id already been promoted into live places?
+
+    Mirrors the first layer of services/places.ts → findExistingPlace: an
+    exact match on the Google place_id stored in places.sources. Catches a
+    promoted row even when its name was edited during review (which the
+    proximity + fuzzy-name check below would miss).
+    """
+    # postgrest-py's .contains() string-joins a Python list (breaks on a list
+    # of dicts), so hand it the JSON text directly — JSONB `@>` containment.
+    res = (
+        supa()
+        .table("places")
+        .select("id")
+        .contains("sources", json.dumps([{"source_id": place_id}]))
+        .limit(1)
+        .execute()
+    )
+    return len(res.data) > 0
+
+
 def already_in_places(name: str, lat: float, lng: float) -> bool:
     """Fuzzy-match against live places. Returns True if this looks like a dup.
 
@@ -298,7 +348,7 @@ def stage_row(
         "raw": {"nearby": nr.raw, "details": details or {}},
         "city": city,
         "country": get_country(city),
-        "search_query": f'"halal" near {district.name}, {city}',
+        "search_query": f'"{nr.search_keyword}" near {district.name}, {city}',
     }
 
 
@@ -345,14 +395,17 @@ def cmd_scrape(
     ) as progress:
         for district in districts:
             task = progress.add_task(f"  {district.name}", total=None)
-            try:
-                nearby = nearby_search(client, district)
-            except Exception as e:
-                print(f"[red]  ! {district.name}: {e}[/]")
-                ph.capture("district_scrape_failed", {"city": city, "district": district.name, "error": str(e)})
-                ph.capture_exception(e)
-                progress.remove_task(task)
-                continue
+            # Sweep the base "halal" search plus each cuisine keyword. A single
+            # keyword failing (e.g. transient INVALID_REQUEST) shouldn't drop the
+            # whole district — log it and keep the other sweeps.
+            nearby: list[NearbyResult] = []
+            for keyword in CUISINE_SEARCH_KEYWORDS:
+                try:
+                    nearby.extend(nearby_search(client, district, keyword))
+                except Exception as e:
+                    print(f"[red]  ! {district.name} / '{keyword}': {e}[/]")
+                    ph.capture("district_scrape_failed", {"city": city, "district": district.name, "keyword": keyword, "error": str(e)})
+                    ph.capture_exception(e)
 
             progress.update(task, total=len(nearby), completed=0)
             for nr in nearby:
@@ -365,9 +418,13 @@ def cmd_scrape(
                     continue
                 seen_place_ids.add(nr.place_id)
                 if already_staged(client, nr.place_id):
+                    # Already in places_staging (ANY state, incl. rejected) — a
+                    # human already reviewed this; never re-surface it.
                     summary["dup_in_staging"] += 1
                     continue
-                if already_in_places(nr.name, nr.lat, nr.lng):
+                # Live places: exact Google place_id match first (survives a
+                # review-time rename), then proximity + fuzzy name.
+                if already_promoted(nr.place_id) or already_in_places(nr.name, nr.lat, nr.lng):
                     summary["dup_in_places"] += 1
                     continue
 
@@ -392,7 +449,21 @@ def cmd_scrape(
         table.add_row(k, str(v))
     print(table)
 
-    ph.capture("scrape_completed", {"city": city, "dry_run": dry_run, **summary})
+    # Which sweep surfaced each newly-staged row? Tells us whether the cuisine
+    # keywords are pulling their weight vs the base "halal" search.
+    by_keyword: dict[str, int] = {}
+    for row in rows_to_insert:
+        kw = row["search_query"].split('"')[1] if '"' in row["search_query"] else "?"
+        by_keyword[kw] = by_keyword.get(kw, 0) + 1
+    if by_keyword:
+        kw_table = Table(title="staged by search keyword")
+        kw_table.add_column("keyword")
+        kw_table.add_column("staged", justify="right")
+        for kw in CUISINE_SEARCH_KEYWORDS:
+            kw_table.add_row(kw, str(by_keyword.get(kw, 0)))
+        print(kw_table)
+
+    ph.capture("scrape_completed", {"city": city, "dry_run": dry_run, **summary, "by_keyword": by_keyword})
 
     if dry_run:
         print("[yellow]Dry run — not writing to staging.[/]")
