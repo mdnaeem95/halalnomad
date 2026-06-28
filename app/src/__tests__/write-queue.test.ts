@@ -42,6 +42,7 @@ import {
   enqueue,
   drainWriteQueue,
   registerWriteHandler,
+  onQueueIdle,
   getQueueSnapshot,
   __resetWriteQueueForTests,
   WriteOp,
@@ -191,6 +192,49 @@ describe('write-queue — transient (network) failures never poison-drop', () =>
     await drainWriteQueue();
     expect(done).toEqual(['keep']);
     expect(await getQueueSnapshot()).toHaveLength(0);
+  });
+});
+
+describe('write-queue — idle reconcile fires once after full drain', () => {
+  it('fires onQueueIdle exactly once when a multi-op drain empties the queue', async () => {
+    registerWriteHandler('list_create', async () => {});
+    const idle = jest.fn();
+    onQueueIdle(idle);
+
+    await enqueue('list_create', 'a', { id: 'a' });
+    await enqueue('list_create', 'b', { id: 'b' });
+    await drainWriteQueue();
+
+    // Once — not per-op — and only after the queue is empty.
+    expect(idle).toHaveBeenCalledTimes(1);
+    expect(await getQueueSnapshot()).toHaveLength(0);
+  });
+
+  it('does NOT fire idle on an empty/no-op drain', async () => {
+    registerWriteHandler('list_create', async () => {});
+    const idle = jest.fn();
+    onQueueIdle(idle);
+    await drainWriteQueue(); // nothing queued
+    expect(idle).not.toHaveBeenCalled();
+  });
+
+  it('does NOT fire idle while an entry is still stuck (failure mid-drain)', async () => {
+    let fail = true;
+    registerWriteHandler('list_create', async (p: { id: string }) => {
+      if (p.id === 'b' && fail) throw new Error('boom'); // permanent (online, non-network)
+    });
+    const idle = jest.fn();
+    onQueueIdle(idle);
+
+    await enqueue('list_create', 'a', { id: 'a' });
+    await enqueue('list_create', 'b', { id: 'b' });
+    await drainWriteQueue(); // a commits, b stuck → queue not empty
+    expect(idle).not.toHaveBeenCalled();
+    expect(await getQueueSnapshot()).toHaveLength(1);
+
+    fail = false;
+    await drainWriteQueue(); // b commits → queue empty → idle fires
+    expect(idle).toHaveBeenCalledTimes(1);
   });
 });
 

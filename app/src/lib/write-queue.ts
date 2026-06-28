@@ -44,6 +44,7 @@ const STORAGE_KEY = 'halalnomad-write-queue';
 const MAX_ATTEMPTS = 5;
 
 const handlers: Partial<Record<WriteOp, Handler>> = {};
+const idleListeners = new Set<() => void>();
 let queue: WriteQueueEntry[] = [];
 let loadPromise: Promise<void> | null = null;
 let draining = false;
@@ -51,6 +52,17 @@ let uidCounter = 0;
 
 export function registerWriteHandler(op: WriteOp, fn: Handler): void {
   handlers[op] = fn;
+}
+
+/**
+ * Fires after a drain commits ≥1 op AND fully empties the queue. Consumers use
+ * this to reconcile (refetch) once all pending writes have landed — doing it
+ * per-op would let a refetch run between two queued writes and momentarily drop
+ * the second's still-pending optimistic row. Returns an unsubscribe fn.
+ */
+export function onQueueIdle(fn: () => void): () => void {
+  idleListeners.add(fn);
+  return () => idleListeners.delete(fn);
 }
 
 function ensureLoaded(): Promise<void> {
@@ -138,6 +150,7 @@ export async function drainWriteQueue(): Promise<void> {
   if (draining) return;
   if (!onlineManager.isOnline()) return;
   draining = true;
+  let committed = 0;
   try {
     // Re-check the head each iteration so items enqueued mid-drain are picked
     // up at the tail and overall ordering is preserved.
@@ -154,6 +167,7 @@ export async function drainWriteQueue(): Promise<void> {
       try {
         await handler(entry.payload, entry);
         await removeByUid(entry.uid); // ack-and-remove PER OP
+        committed += 1;
       } catch (e) {
         if (isTransientError(e)) {
           // Connectivity blip — preserve the entry untouched and retry on the
@@ -184,6 +198,16 @@ export async function drainWriteQueue(): Promise<void> {
   } finally {
     draining = false;
   }
+  // Reconcile only once everything pending has committed — never mid-drain.
+  if (committed > 0 && queue.length === 0) {
+    idleListeners.forEach((fn) => {
+      try {
+        fn();
+      } catch (e) {
+        captureError(e as Error, { area: 'write-queue.idle' });
+      }
+    });
+  }
 }
 
 let unsubscribe: (() => void) | null = null;
@@ -205,4 +229,5 @@ export function __resetWriteQueueForTests(): void {
   draining = false;
   uidCounter = 0;
   for (const k of Object.keys(handlers) as WriteOp[]) delete handlers[k];
+  idleListeners.clear();
 }

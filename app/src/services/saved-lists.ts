@@ -12,8 +12,9 @@
  */
 
 import { supabase } from '../lib/supabase';
+import { queryClient } from '../lib/query-client';
 import { sanitizeText } from '../lib/sanitize';
-import { registerWriteHandler } from '../lib/write-queue';
+import { registerWriteHandler, onQueueIdle } from '../lib/write-queue';
 import { SavedList } from '../types';
 
 export const LIST_NAME_MAX = 80; // matches the saved_lists_name_len CHECK
@@ -74,16 +75,27 @@ export async function deleteSavedList(id: string): Promise<void> {
  * Call this once at app launch BEFORE initWriteQueue() so a launch-drain has
  * its handlers registered. Payload shapes are the enqueue payloads from
  * useSavedLists.
+ *
+ * Reconciliation (refetch) is fired from the queue's onQueueIdle — once all
+ * pending writes have committed and the queue is empty — NOT from the mutation's
+ * onSettled. The write is async (the queue drains it), so a settle-time refetch
+ * would race and beat the write, read stale server state, and clobber the
+ * optimistic row. Reconciling on idle (vs per-op) also avoids a refetch landing
+ * between two queued writes and momentarily dropping the second's optimistic row.
  */
 export function registerSavedListWriteHandlers(): void {
-  registerWriteHandler('list_create', (p: {
-    id: string;
-    user_id: string;
-    name: string;
-    is_default: boolean;
-  }) => createSavedList(p));
+  registerWriteHandler(
+    'list_create',
+    (p: { id: string; user_id: string; name: string; is_default: boolean }) => createSavedList(p)
+  );
   registerWriteHandler('list_rename', (p: { id: string; name: string }) =>
     renameSavedList(p.id, p.name)
   );
   registerWriteHandler('list_delete', (p: { id: string }) => deleteSavedList(p.id));
+
+  // After the queue fully drains, reconcile the cache with post-commit server
+  // state. Fire-and-forget: a failed refetch must not affect the queue.
+  onQueueIdle(() => {
+    void queryClient.invalidateQueries({ queryKey: ['saved-lists'] });
+  });
 }

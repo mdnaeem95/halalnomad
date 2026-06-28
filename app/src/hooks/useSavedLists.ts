@@ -74,9 +74,9 @@ export function useCreateList() {
         source,
       });
     },
-    onSettled: (_d, _e, { row }) => {
-      queryClient.invalidateQueries({ queryKey: savedListKeys.list(row.user_id) });
-    },
+    // No onSettled refetch: the write is performed async by the queue, so a
+    // settle-time invalidate would race and beat it. The reconciling refetch is
+    // fired post-commit from the write-queue handler (see saved-lists service).
   });
 
   /**
@@ -138,9 +138,7 @@ export function useRenameList() {
     onSuccess: (_data, { id }) => {
       track(EVENTS.TRIP_LIST_RENAMED, { list_id: id });
     },
-    onSettled: () => {
-      if (user) queryClient.invalidateQueries({ queryKey: savedListKeys.list(user.id) });
-    },
+    // Refetch is fired post-commit from the write-queue handler, not here.
   });
 }
 
@@ -170,8 +168,6 @@ export function useDeleteList() {
     onSuccess: (_data, { id, placeCount }) => {
       track(EVENTS.TRIP_LIST_DELETED, { list_id: id, place_count_at_delete: placeCount ?? 0 });
     },
-    onSettled: () => {
-      if (user) queryClient.invalidateQueries({ queryKey: savedListKeys.list(user.id) });
-    },
+    // Refetch is fired post-commit from the write-queue handler, not here.
   });
 }
