@@ -24,6 +24,49 @@ It runs `eas build --platform ios --profile production` then, if the build
 succeeds, `eas update --branch production` with the same message. If the
 build fails, no OTA is published.
 
+## Staging gate (preview channel)
+
+Before promoting anything to production, validate it on the **`preview`**
+channel. There are two EAS channels, defined in `eas.json`:
+
+| Channel | Build profile | Who runs it | Promoted via |
+|---|---|---|---|
+| `preview` | `preview` (internal dist) | the test device(s) | `release-preview.sh` |
+| `production` | `production` (App Store) | real users | `release-prod.sh` |
+
+Day-to-day flow for a JS-only change (which is most changes):
+
+```bash
+cd app
+
+# 1. Publish to preview, validate on the test device.
+./scripts/release-preview.sh "short message"
+
+# 2. Once it checks out, promote the SAME commit to production.
+./scripts/release-prod.sh "short message"
+```
+
+One-time (or after any native change — new dep, app.json, runtimeVersion bump):
+cut a preview binary and install it on the test device, after which it keeps
+receiving preview OTAs:
+
+```bash
+./scripts/release-preview.sh --with-build "short message"
+```
+
+**What this does and doesn't isolate.** The channel split isolates the **JS
+bundle** — testers run preview JS, users run production JS, independently. It
+does **not** isolate **data**: both channels point at the **same Supabase
+project** (one `SUPABASE_URL`). So preview writes hit the production DB (fine
+for user-scoped, RLS-owned data with a test account) and **schema migrations
+are still run by hand in prod Supabase regardless of channel** — there is no
+staging database. If you ever need that, it's a separate Supabase project keyed
+off `APP_ENV`, which is a deliberate, separate setup — not part of this gate.
+
+Same OTA discipline applies: a preview OTA only reaches a device whose installed
+build is on the `preview` channel **and** matches the current `runtimeVersion`.
+Native changes need a fresh `--with-build`.
+
 ## Manual two-step (if you need control)
 
 ```bash
@@ -72,6 +115,7 @@ at current main (commit 93004c6).
 
 ## Checklist before running a production release
 
+- [ ] Validated on the `preview` channel / test device (`release-preview.sh`)
 - [ ] Working tree clean, latest changes pushed to `main`
 - [ ] `npx tsc --noEmit` passes in `app/`
 - [ ] Any SQL migrations run in Supabase
