@@ -67,6 +67,16 @@ Same OTA discipline applies: a preview OTA only reaches a device whose installed
 build is on the `preview` channel **and** matches the current `runtimeVersion`.
 Native changes need a fresh `--with-build`.
 
+**Sentry source maps on preview.** The preview profile sets
+`SENTRY_DISABLE_AUTO_UPLOAD=true` because `SENTRY_AUTH_TOKEN` is a build secret
+scoped to the *production* EAS environment only; without it the Sentry CLI
+upload step fails the build. Runtime crash capture still works (the DSN is an
+`EXPO_PUBLIC_*` var) — preview crashes just won't be symbolicated, which is fine
+for an internal build on a known commit. If you ever want symbolicated preview
+crashes, add `SENTRY_AUTH_TOKEN` to the `preview` environment
+(`eas env:create --environment preview --name SENTRY_AUTH_TOKEN --type secret`)
+and drop the disable flag.
+
 ## Manual two-step (if you need control)
 
 ```bash
