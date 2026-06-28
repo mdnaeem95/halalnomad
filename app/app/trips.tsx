@@ -97,8 +97,13 @@ export default function TripsScreen() {
   // Header "+" — only meaningful when signed in.
   const headerRight = user
     ? () => (
-        <Pressable onPress={openCreate} hitSlop={12} accessibilityLabel={t('trips.newTrip')}>
-          <Ionicons name="add" size={28} color={c.textOnPrimary} />
+        <Pressable
+          onPress={openCreate}
+          hitSlop={12}
+          accessibilityLabel={t('trips.newTrip')}
+          style={styles.headerAdd}
+        >
+          <Ionicons name="add" size={26} color={c.textOnPrimary} />
         </Pressable>
       )
     : undefined;
@@ -134,6 +139,10 @@ export default function TripsScreen() {
           data={lists ?? []}
           keyExtractor={(item) => item.id}
           contentContainerStyle={styles.listContent}
+          // v2 enables maintainVisibleContentPosition by default — which pins
+          // existing rows and pushes a newly-prepended trip above the viewport.
+          // We sort newest-first, so the new trip must show at the top instead.
+          maintainVisibleContentPosition={{ disabled: true }}
           renderItem={({ item }) => (
             <View style={styles.row}>
               <View style={styles.rowMain}>
@@ -203,6 +212,9 @@ export default function TripsScreen() {
 const createStyles = (c: AppColors) =>
   StyleSheet.create({
     container: { flex: 1, backgroundColor: c.background },
+    // Square, centered tap target so the "+" glyph sits dead-centre inside
+    // iOS 26's Liquid Glass nav-button circle.
+    headerAdd: { width: 30, height: 30, alignItems: 'center', justifyContent: 'center' },
     center: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 32, gap: 12 },
     emptyTitle: { fontSize: 20, fontWeight: '700', color: c.textPrimary, marginTop: 8 },
     emptySubtitle: { fontSize: 15, color: c.textSecondary, textAlign: 'center', lineHeight: 22 },
