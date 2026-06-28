@@ -244,11 +244,18 @@ export interface UserProfile {
   total_days_active: number;
 }
 
+// Trip Planning M1. `id` accepts a client-supplied UUID at create time so
+// offline creates replay idempotently (create = UPSERT-by-id). `updated_at`
+// is the "My Trips" sort key (auto-bumped by a DB trigger, never client-set);
+// `is_default` is the one-per-user default trip (partial unique index).
+// See migration-023.
 export interface SavedList {
   id: string;
   user_id: string;
   name: string;
+  is_default: boolean;
   created_at: string;
+  updated_at: string;
 }
 
 export type MapProviderType = 'google' | 'amap' | 'apple';

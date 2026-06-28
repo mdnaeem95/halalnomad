@@ -160,6 +160,20 @@ export default function ProfileScreen() {
         </View>
       </View>
 
+      {/* My Trips — Trip Planning M1 (free; not gated behind Premium) */}
+      <Pressable
+        style={styles.navCard}
+        onPress={() => router.push('/trips')}
+        accessibilityRole="button"
+        accessibilityLabel={t('profile.myTrips')}
+      >
+        <View style={styles.navIcon}>
+          <Ionicons name="map-outline" size={22} color={c.primary} />
+        </View>
+        <Text style={styles.navLabel}>{t('profile.myTrips')}</Text>
+        <Ionicons name="chevron-forward" size={20} color={c.textTertiary} />
+      </Pressable>
+
       {/* Premium upsell — gated behind FEATURES.premiumEnabled.
           Disabled at v1 launch since Phase 2 features (offline maps,
           advanced filters, trip planning) aren't built yet. See
@@ -607,6 +621,32 @@ const createStyles = (c: AppColors) => StyleSheet.create({
   },
   themeLabelActive: {
     color: c.primary,
+  },
+  navCard: {
+    backgroundColor: c.surface,
+    borderRadius: borderRadius.lg,
+    padding: spacing.md,
+    marginTop: spacing.md,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.md,
+    borderWidth: 1,
+    borderColor: c.border,
+    ...shadows.md,
+  },
+  navIcon: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: c.primary + '18',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  navLabel: {
+    flex: 1,
+    fontSize: 16,
+    fontWeight: '600',
+    color: c.textPrimary,
   },
   premiumCard: {
     backgroundColor: c.surface,

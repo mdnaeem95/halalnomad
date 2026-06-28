@@ -91,6 +91,11 @@ export const EVENTS = {
   ONBOARDING_DISCLAIMER_ACKNOWLEDGED: 'onboarding_disclaimer_acknowledged',
   ONBOARDING_COMPLETED: 'onboarding_completed',
 
+  // Trip Planning (M1)
+  TRIP_LIST_CREATED: 'trip_list_created',
+  TRIP_LIST_RENAMED: 'trip_list_renamed',
+  TRIP_LIST_DELETED: 'trip_list_deleted',
+
   // Engagement
   LANGUAGE_CHANGED: 'language_changed',
   APP_RATING_PROMPTED: 'app_rating_prompted',

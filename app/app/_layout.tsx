@@ -17,6 +17,8 @@ import { LoadingSplash } from '../src/components/LoadingSplash';
 import { Onboarding } from '../src/components/Onboarding';
 import { initSentry } from '../src/lib/sentry';
 import { initRevenueCat } from '../src/lib/revenue-cat';
+import { initWriteQueue } from '../src/lib/write-queue';
+import { registerSavedListWriteHandlers } from '../src/services/saved-lists';
 import '../src/i18n';
 
 // Bumping the suffix forces existing users through onboarding again
@@ -29,6 +31,10 @@ SplashScreen.preventAutoHideAsync().catch(() => {});
 
 initSentry();
 initRevenueCat();
+// Register the durable write-queue handlers BEFORE wiring the launch/reconnect
+// drain, so a pending offline write from a previous session can replay on boot.
+registerSavedListWriteHandlers();
+initWriteQueue();
 
 // First-install boot can stack: expo-updates manifest check, JS cold
 // start on cheap Android, AsyncStorage cold init, Supabase session
@@ -109,6 +115,13 @@ function AppStack() {
         }}
       >
         <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+        <Stack.Screen
+          name="trips"
+          options={{
+            title: t('trips.title'),
+            headerBackButtonDisplayMode: 'minimal',
+          }}
+        />
         <Stack.Screen
           name="place/[id]"
           options={{

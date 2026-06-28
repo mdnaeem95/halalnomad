@@ -137,7 +137,30 @@ export default {
     earnVerify: 'Confirm Halal status',
     earnPhoto: 'Upload a photo',
     earnReport: 'Report a place',
+    myTrips: 'My Trips',
     signOut: 'Sign Out',
+  },
+
+  // Trip Planning (M1)
+  trips: {
+    title: 'My Trips',
+    emptyTitle: 'No trips yet',
+    emptySubtitle: 'Plan your next journey — group the Halal places you want to visit into a trip.',
+    createFirst: 'Create your first trip',
+    newTrip: 'New trip',
+    namePlaceholder: 'e.g. Tokyo food crawl',
+    create: 'Create',
+    cancel: 'Cancel',
+    save: 'Save',
+    rename: 'Rename',
+    renameTitle: 'Rename trip',
+    delete: 'Delete',
+    deleteTitle: 'Delete trip?',
+    deleteMessage: 'This removes “{{name}}”. This can’t be undone.',
+    capReachedTitle: 'Trip limit reached',
+    capReachedMessage: 'You can keep up to {{max}} trips. Delete one to make room.',
+    signedOutTitle: 'Sign in to plan trips',
+    signedOutSubtitle: 'Trips are saved to your account so they’re there on every device.',
   },
 
   // Report warning component
