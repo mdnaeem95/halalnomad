@@ -17,6 +17,7 @@ import { useLocation } from '../../src/hooks/useLocation';
 import { useTheme } from '../../src/hooks/useTheme';
 import { useCooldown } from '../../src/hooks/useCooldown';
 import { useAddReview, usePlace, useReviews, useUserVerifications, useVerifyPlace } from '../../src/hooks/usePlaces';
+import { useSaveToTrip, useSavedPlaceIds } from '../../src/hooks/useSavedLists';
 import { getMapProvider } from '../../src/services/map';
 import {
   CUISINE_LABELS,
@@ -29,7 +30,6 @@ import {
 } from '../../src/types';
 import { HalalBadge } from '../../src/components/HalalBadge';
 import { FeaturedBadge } from '../../src/components/FeaturedBadge';
-import { usePremiumGuard } from '../../src/components/PremiumGate';
 import { ReportWarning } from '../../src/components/ReportWarning';
 import { ReviewModal } from '../../src/components/ReviewModal';
 import { PlaceDetailSkeleton } from '../../src/components/Skeleton';
@@ -41,7 +41,6 @@ import {
   spacing,
   typography,
 } from '../../src/constants/theme';
-import { FEATURES } from '../../src/constants/features';
 import { EVENTS, track } from '../../src/lib/analytics';
 import { normalizePlaceSource } from '../../src/lib/navigation';
 import { useAppStore } from '../../src/stores/app-store';
@@ -116,9 +115,11 @@ export default function PlaceDetailScreen() {
   );
   const { colors: c } = useTheme();
   const styles = React.useMemo(() => createStyles(c), [c]);
-  const { requirePremium } = usePremiumGuard();
   const verifyMutation = useVerifyPlace();
   const reviewMutation = useAddReview();
+  const saveToTrip = useSaveToTrip();
+  const { data: savedPlaceIds } = useSavedPlaceIds();
+  const isSaved = !!place && (savedPlaceIds ?? []).includes(place.id);
   const { isOnCooldown: verifyOnCooldown, trigger: triggerVerify } = useCooldown(5000);
   const { isOnCooldown: reportOnCooldown, trigger: triggerReport } = useCooldown(5000);
   const [reviewModalVisible, setReviewModalVisible] = useState(false);
@@ -203,6 +204,36 @@ export default function PlaceDetailScreen() {
         }
       );
     });
+  }
+
+  function handleSave() {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    if (!user || !place) {
+      setDialog({
+        visible: true,
+        variant: 'info',
+        title: 'Sign in required',
+        message: 'Please sign in to save places to a trip.',
+        actions: [
+          { label: 'Sign In', onPress: () => { closeDialog(); router.push('/auth'); }, style: 'primary' },
+          { label: 'Cancel', onPress: closeDialog, style: 'cancel' },
+        ],
+      });
+      return;
+    }
+    // Wait for the trips list to resolve so we don't create a duplicate default.
+    if (!saveToTrip.ready) return;
+    if (isSaved) {
+      showToast('Already in your trip', 'info');
+      return;
+    }
+    try {
+      const { title } = saveToTrip.save(place);
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      showToast(`Saved to ${title}`);
+    } catch {
+      showToast('Could not save — please try again', 'error');
+    }
   }
 
   function handleFlag(type: 'flag_closed' | 'flag_not_halal') {
@@ -558,27 +589,30 @@ export default function PlaceDetailScreen() {
             </View>
           </View>
 
-          {/* Save to List — Premium-gated. Hidden until Phase 2 features
-              ship and Premium is re-enabled. See src/constants/features.ts. */}
-          {FEATURES.premiumEnabled && (
-            <Pressable
-              style={[styles.saveButton, { backgroundColor: c.surface, borderColor: c.accent }]}
-              onPress={() => {
-                if (requirePremium()) {
-                  Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-                  showToast('Saved to list! (coming soon)', 'info');
-                }
-              }}
-              accessibilityRole="button"
-              accessibilityLabel="Save to trip list. Premium feature."
-            >
-              <Ionicons name="bookmark-outline" size={18} color={c.accent} />
-              <Text style={[styles.saveButtonText, { color: c.accent }]}>Save to List</Text>
-              <View style={[styles.premiumBadge, { backgroundColor: c.accent }]}>
-                <Text style={styles.premiumBadgeText}>PRO</Text>
-              </View>
-            </Pressable>
-          )}
+          {/* Save to a trip — free (Trip Planning M1). Wk2: saves into the
+              user's default trip, creating it on the first-ever save. The
+              multi-list picker is M2. */}
+          <Pressable
+            style={[
+              styles.saveButton,
+              { backgroundColor: isSaved ? c.primaryLight + '18' : c.surface, borderColor: c.primaryLight },
+              (saveToTrip.isPending || !saveToTrip.ready) && styles.buttonDisabled,
+            ]}
+            onPress={handleSave}
+            disabled={saveToTrip.isPending || !saveToTrip.ready}
+            accessibilityRole="button"
+            accessibilityLabel={isSaved ? 'Saved to your trip' : 'Save this place to a trip'}
+            accessibilityState={{ disabled: saveToTrip.isPending || !saveToTrip.ready }}
+          >
+            <Ionicons
+              name={isSaved ? 'bookmark' : 'bookmark-outline'}
+              size={18}
+              color={c.primaryLight}
+            />
+            <Text style={[styles.saveButtonText, { color: c.primaryLight }]}>
+              {isSaved ? 'Saved to trip' : 'Save to a trip'}
+            </Text>
+          </Pressable>
 
           <Pressable
             style={[

@@ -238,6 +238,30 @@ describe('write-queue — idle reconcile fires once after full drain', () => {
   });
 });
 
+describe('write-queue — save-to-trip: default create then place add (FIFO)', () => {
+  it('replays default_trip_create before place_add, even queued offline', async () => {
+    const calls: string[] = [];
+    registerWriteHandler('default_trip_create', async (p: { list_id: string }) => {
+      calls.push(`default:${p.list_id}`);
+    });
+    registerWriteHandler('place_add', async (p: { list_id: string; place_id: string }) => {
+      calls.push(`add:${p.list_id}:${p.place_id}`);
+    });
+
+    onlineManager.setOnline(false);
+    await enqueue('default_trip_create', 'L', { list_id: 'L', title: 'Tokyo' });
+    await enqueue('place_add', 'L', { list_id: 'L', place_id: 'P', added_at: 't' });
+    await drainWriteQueue(); // offline no-op
+    expect(calls).toEqual([]);
+
+    onlineManager.setOnline(true);
+    await drainWriteQueue();
+    // Create commits before add → the place-add never references a missing list.
+    expect(calls).toEqual(['default:L', 'add:L:P']);
+    expect(await getQueueSnapshot()).toHaveLength(0);
+  });
+});
+
 describe('write-queue — drain is a no-op when empty', () => {
   it('does nothing with an empty queue', async () => {
     const handler = jest.fn();

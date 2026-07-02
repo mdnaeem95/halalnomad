@@ -23,7 +23,12 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { onlineManager } from '@tanstack/react-query';
 import { captureError } from './sentry';
 
-export type WriteOp = 'list_create' | 'list_rename' | 'list_delete';
+export type WriteOp =
+  | 'list_create'
+  | 'list_rename'
+  | 'list_delete'
+  | 'default_trip_create'
+  | 'place_add';
 
 export interface WriteQueueEntry {
   uid: string; // unique per queue entry — the ack-and-remove key

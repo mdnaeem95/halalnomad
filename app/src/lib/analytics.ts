@@ -95,6 +95,7 @@ export const EVENTS = {
   TRIP_LIST_CREATED: 'trip_list_created',
   TRIP_LIST_RENAMED: 'trip_list_renamed',
   TRIP_LIST_DELETED: 'trip_list_deleted',
+  PLACE_SAVED_TO_LIST: 'place_saved_to_list',
 
   // Engagement
   LANGUAGE_CHANGED: 'language_changed',

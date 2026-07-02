@@ -258,4 +258,15 @@ export interface SavedList {
   updated_at: string;
 }
 
+// A place's membership in a saved_lists trip (the join table, migration 023).
+// `position` is a 1000-step ordinal (server-assigned); `day_index` is null
+// until day-grouping ships (M3).
+export interface SavedListPlace {
+  list_id: string;
+  place_id: string;
+  added_at: string;
+  position: number;
+  day_index: number | null;
+}
+
 export type MapProviderType = 'google' | 'amap' | 'apple';

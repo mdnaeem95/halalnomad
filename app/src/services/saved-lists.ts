@@ -70,6 +70,44 @@ export async function deleteSavedList(id: string): Promise<void> {
   if (error) throw error;
 }
 
+// --- Save-to-trip (Wk2) ---------------------------------------------------
+
+/**
+ * Atomic default-trip create (clears any old default, sets this one) via the
+ * set_default_trip RPC. Idempotent on the client UUID. Bypasses the soft cap.
+ */
+export async function setDefaultTrip(listId: string, title: string): Promise<void> {
+  const { error } = await supabase.rpc('set_default_trip', {
+    p_list_id: listId,
+    p_title: sanitizeText(title).slice(0, LIST_NAME_MAX),
+  });
+  if (error) throw error;
+}
+
+/** Add a place to a list at the next 1000-step position (server-computed),
+ *  idempotent on the (list_id, place_id) PK, via the add_place_to_list RPC. */
+export async function addPlaceToList(
+  listId: string,
+  placeId: string,
+  addedAt: string
+): Promise<void> {
+  const { error } = await supabase.rpc('add_place_to_list', {
+    p_list_id: listId,
+    p_place_id: placeId,
+    p_added_at: addedAt,
+  });
+  if (error) throw error;
+}
+
+/** Place ids saved across all of the caller's lists — powers the place-detail
+ *  "Saved" indicator. RLS scopes saved_list_places to the owner, so no explicit
+ *  user filter is needed. */
+export async function fetchSavedPlaceIds(): Promise<string[]> {
+  const { data, error } = await supabase.from('saved_list_places').select('place_id');
+  if (error) throw error;
+  return [...new Set((data ?? []).map((r) => r.place_id as string))];
+}
+
 /**
  * Wire the durable write-queue handlers to the idempotent service calls.
  * Call this once at app launch BEFORE initWriteQueue() so a launch-drain has
@@ -92,10 +130,19 @@ export function registerSavedListWriteHandlers(): void {
     renameSavedList(p.id, p.name)
   );
   registerWriteHandler('list_delete', (p: { id: string }) => deleteSavedList(p.id));
+  registerWriteHandler('default_trip_create', (p: { list_id: string; title: string }) =>
+    setDefaultTrip(p.list_id, p.title)
+  );
+  registerWriteHandler(
+    'place_add',
+    (p: { list_id: string; place_id: string; added_at: string }) =>
+      addPlaceToList(p.list_id, p.place_id, p.added_at)
+  );
 
-  // After the queue fully drains, reconcile the cache with post-commit server
+  // After the queue fully drains, reconcile both caches with post-commit server
   // state. Fire-and-forget: a failed refetch must not affect the queue.
   onQueueIdle(() => {
     void queryClient.invalidateQueries({ queryKey: ['saved-lists'] });
+    void queryClient.invalidateQueries({ queryKey: ['saved-places'] });
   });
 }

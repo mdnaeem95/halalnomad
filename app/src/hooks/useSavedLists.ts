@@ -12,13 +12,13 @@
  */
 
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { fetchSavedLists } from '../services/saved-lists';
+import { fetchSavedLists, fetchSavedPlaceIds } from '../services/saved-lists';
 import { enqueue, drainWriteQueue } from '../lib/write-queue';
 import { useAuth } from './useAuth';
 import { uuidv4 } from '../lib/uuid';
 import { captureError } from '../lib/sentry';
 import { track, EVENTS } from '../lib/analytics';
-import { SavedList } from '../types';
+import { Place, SavedList } from '../types';
 
 // v1 soft cap. Enforced client-side (the screen disables create at the cap and
 // the create() helper throws LIST_CAP_REACHED as a backstop). No server CHECK —
@@ -30,11 +30,27 @@ export const savedListKeys = {
   list: (userId: string) => ['saved-lists', userId] as const,
 };
 
+export const savedPlaceKeys = {
+  all: ['saved-places'] as const,
+  ids: (userId: string) => ['saved-places', userId] as const,
+};
+
 export function useSavedLists() {
   const { user } = useAuth();
   return useQuery({
     queryKey: savedListKeys.list(user?.id ?? 'anon'),
     queryFn: () => fetchSavedLists(user!.id),
+    enabled: !!user,
+  });
+}
+
+/** Place ids saved across all of the user's trips — for the place-detail
+ *  "Saved" indicator. */
+export function useSavedPlaceIds() {
+  const { user } = useAuth();
+  return useQuery({
+    queryKey: savedPlaceKeys.ids(user?.id ?? 'anon'),
+    queryFn: () => fetchSavedPlaceIds(),
     enabled: !!user,
   });
 }
@@ -170,4 +186,104 @@ export function useDeleteList() {
     },
     // Refetch is fired post-commit from the write-queue handler, not here.
   });
+}
+
+// --- Save to a trip (Wk2) ---------------------------------------------------
+
+type SaveVars = {
+  placeId: string;
+  listId: string;
+  isFirst: boolean; // first-ever save → create the default trip first
+  title: string; // default-trip title when isFirst (the place's city)
+};
+
+/**
+ * "Save to a trip" for place detail. Wk2 scope: the first-save-into-the-default
+ * path only (the multi-list picker is M2). On the user's first-ever save it
+ * creates the default trip (atomic set_default_trip RPC) and then adds the
+ * place; subsequent saves add to the existing default. Both writes go through
+ * the Wk-1 FIFO queue, enqueued create-then-add so the place-add always follows
+ * the trip it references.
+ */
+export function useSaveToTrip() {
+  const queryClient = useQueryClient();
+  const { user } = useAuth();
+  const listsQuery = useSavedLists();
+  const lists = listsQuery.data;
+
+  const mutation = useMutation({
+    mutationFn: async ({ placeId, listId, isFirst, title }: SaveVars) => {
+      // FIFO: the default-trip create must be enqueued BEFORE the place-add that
+      // references its list_id, so the queue commits them in that order.
+      if (isFirst) {
+        await enqueue('default_trip_create', listId, { list_id: listId, title });
+      }
+      await enqueue('place_add', listId, {
+        list_id: listId,
+        place_id: placeId,
+        added_at: new Date().toISOString(),
+      });
+      void drainWriteQueue();
+    },
+    onMutate: async ({ placeId, listId, isFirst, title }) => {
+      if (!user) return {};
+      const placesKey = savedPlaceKeys.ids(user.id);
+      const listsKey = savedListKeys.list(user.id);
+      await queryClient.cancelQueries({ queryKey: placesKey });
+      const prevPlaces = queryClient.getQueryData<string[]>(placesKey);
+      queryClient.setQueryData<string[]>(placesKey, (old = []) =>
+        old.includes(placeId) ? old : [...old, placeId]
+      );
+
+      let prevLists: SavedList[] | undefined;
+      if (isFirst) {
+        await queryClient.cancelQueries({ queryKey: listsKey });
+        prevLists = queryClient.getQueryData<SavedList[]>(listsKey);
+        const now = new Date().toISOString();
+        const row: SavedList = {
+          id: listId,
+          user_id: user.id,
+          name: title,
+          is_default: true,
+          created_at: now,
+          updated_at: now,
+        };
+        queryClient.setQueryData<SavedList[]>(listsKey, (old = []) => [row, ...old]);
+      }
+      return { prevPlaces, prevLists, placesKey, listsKey };
+    },
+    onError: (err, _vars, ctx) => {
+      if (ctx?.prevPlaces && ctx?.placesKey) queryClient.setQueryData(ctx.placesKey, ctx.prevPlaces);
+      if (ctx?.prevLists && ctx?.listsKey) queryClient.setQueryData(ctx.listsKey, ctx.prevLists);
+      captureError(err as Error, { mutation: 'saveToTrip' });
+    },
+    onSuccess: (_data, { placeId, listId, isFirst }) => {
+      if (isFirst) {
+        track(EVENTS.TRIP_LIST_CREATED, { list_id: listId, is_default: true, source: 'first_save' });
+      }
+      track(EVENTS.PLACE_SAVED_TO_LIST, {
+        place_id: placeId,
+        list_id: listId,
+        source_screen: 'place_detail',
+      });
+    },
+    // Reconciliation is fired post-commit from the write-queue (onQueueIdle).
+  });
+
+  /** Save a place into the default trip, creating that trip on first-ever save.
+   *  Returns the resolved trip title (for the confirmation toast). Throws
+   *  NOT_AUTHENTICATED if signed out. */
+  function save(place: Place): { title: string; isFirst: boolean } {
+    if (!user) throw new Error('NOT_AUTHENTICATED');
+    const existingDefault = (lists ?? []).find((l) => l.is_default);
+    const isFirst = !existingDefault;
+    const listId = existingDefault?.id ?? uuidv4();
+    const title = existingDefault?.name ?? place.city ?? place.name_en ?? 'My Trip';
+    mutation.mutate({ placeId: place.id, listId, isFirst, title });
+    return { title, isFirst };
+  }
+
+  // Avoid creating a duplicate default before the lists query has resolved.
+  const ready = listsQuery.isSuccess || !user;
+  return { ...mutation, save, ready };
 }
