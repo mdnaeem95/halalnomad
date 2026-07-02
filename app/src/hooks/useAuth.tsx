@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
+import { AppState } from 'react-native';
 import { Session, User } from '@supabase/supabase-js';
-import { supabase } from '../lib/supabase';
+import { supabase, readPersistedSession } from '../lib/supabase';
 import { setSentryUser } from '../lib/sentry';
 import { aliasUser, identifyUser, registerSuperProperties, resetAnalytics, setPersonProperties } from '../lib/analytics';
 import { personPropertiesFromProfile } from '../lib/session';
@@ -80,35 +81,22 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }
 
   useEffect(() => {
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      setSession(session);
-      if (session?.user) {
-        const uid = session.user.id;
-        identifyUser(uid);
-        analyticsAliasedFor = uid; // existing session: already the user, no anon to alias
-        fetchProfile(uid, true);
-        loginRevenueCat(uid);
-      }
-      setIsLoading(false);
-    });
+    let mounted = true;
 
-    const {
-      data: { subscription },
-    } = supabase.auth.onAuthStateChange((_event, session) => {
-      setSession(session);
-      setSentryUser(session?.user?.id ?? null);
-      if (session?.user) {
-        const uid = session.user.id;
-        // Identity stitch: alias the pre-auth anonymous distinct_id into the
-        // user exactly once (sign-in path), then identify. identify() also
-        // stitches, so alias is belt-and-braces; guarded against the
-        // token-refresh re-fires of onAuthStateChange.
-        if (analyticsAliasedFor !== uid) {
+    // Apply a session to state + downstream integrations. `initial` = the boot
+    // path (existing session; don't re-alias analytics — there's no anon id to
+    // stitch). Later events (sign-in) do alias exactly once.
+    function handleSession(next: Session | null, initial: boolean) {
+      setSession(next);
+      setSentryUser(next?.user?.id ?? null);
+      if (next?.user) {
+        const uid = next.user.id;
+        if (!initial && analyticsAliasedFor !== uid) {
           aliasUser(uid);
-          analyticsAliasedFor = uid;
         }
+        if (analyticsAliasedFor !== uid) analyticsAliasedFor = uid;
         identifyUser(uid);
-        fetchProfile(uid, true);
+        fetchProfile(uid, true); // network call — fails soft offline (no profile set)
         loginRevenueCat(uid);
       } else {
         resetAnalytics();
@@ -116,9 +104,45 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         setProfile(null);
         logoutRevenueCat();
       }
+    }
+
+    // Boot: getSession() returns null offline when the token is expired (the
+    // refresh can't reach the network) even though the session is still stored.
+    // Fall back to the persisted session so the app stays signed in offline;
+    // auto-refresh revalidates it once connectivity returns.
+    (async () => {
+      let { data: { session } } = await supabase.auth.getSession();
+      if (!session) session = await readPersistedSession();
+      if (!mounted) return;
+      handleSession(session, true);
+      setIsLoading(false);
+    })();
+
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange((event, session) => {
+      // The boot path above owns the initial state (incl. the offline fallback);
+      // ignoring INITIAL_SESSION avoids its null clobbering a hydrated session.
+      if (event === 'INITIAL_SESSION') return;
+      handleSession(session, false);
     });
 
-    return () => subscription.unsubscribe();
+    // Supabase RN requirement: gate token auto-refresh on foreground, so it
+    // resumes (and revalidates an expired token) when the app returns to the
+    // foreground online — without this, returning online after an offline kill
+    // wouldn't recover the session.
+    const appState = AppState.addEventListener('change', (state) => {
+      if (state === 'active') supabase.auth.startAutoRefresh();
+      else supabase.auth.stopAutoRefresh();
+    });
+    if (AppState.currentState === 'active') supabase.auth.startAutoRefresh();
+
+    return () => {
+      mounted = false;
+      subscription.unsubscribe();
+      appState.remove();
+      supabase.auth.stopAutoRefresh();
+    };
   }, []);
 
   async function signUp(email: string, password: string, displayName: string) {
