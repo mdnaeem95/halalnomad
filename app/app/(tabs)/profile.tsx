@@ -1,5 +1,6 @@
 import React from 'react';
 import { Linking, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import * as Updates from 'expo-updates';
 import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useTranslation } from 'react-i18next';
@@ -325,6 +326,13 @@ export default function ProfileScreen() {
           <Text style={styles.legalLink}>Privacy Policy</Text>
         </Pressable>
       </View>
+
+      {/* Build marker — confirms which JS bundle is live (esp. after a preview
+          OTA). Bump BUILD_TAG each build; `embedded` = running the binary's
+          bundled JS (no OTA applied yet). */}
+      <Text style={styles.buildMarker}>
+        {`build wk2-auth-offline · ${Updates.isEmbeddedLaunch ? 'embedded' : (Updates.updateId?.slice(0, 8) ?? 'ota')}`}
+      </Text>
     </ScrollView>
   );
 }
@@ -550,6 +558,13 @@ const createStyles = (c: AppColors) => StyleSheet.create({
   legalDot: {
     ...typography.caption,
     color: c.textTertiary,
+  },
+  buildMarker: {
+    ...typography.caption,
+    color: c.textTertiary,
+    textAlign: 'center',
+    paddingBottom: spacing.lg,
+    opacity: 0.6,
   },
   themeToggle: {
     flexDirection: 'row',
