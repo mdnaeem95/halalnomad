@@ -44,7 +44,7 @@ export default function ProfileScreen() {
       .then(setDiag)
       .catch((e) => setDiag('diag-err:' + String(e).slice(0, 40)));
   }, []);
-  const diagLine = `u=${user?.id?.slice(0, 8) ?? 'null'} ${diag}`;
+  const diagLine = `u=${user?.id?.slice(0, 8) ?? 'null'} p=${profile ? 'y' : 'n'} ${diag}`;
 
   if (!user || !profile) {
     return (
@@ -98,7 +98,7 @@ export default function ProfileScreen() {
 
         {/* TEMP auth diagnostic (remove after debugging) */}
         <Text style={styles.buildMarker} selectable>
-          {`build wk2-auth-offline\n${diagLine}`}
+          {`build wk2-profilecache\n${diagLine}`}
         </Text>
       </View>
     );
@@ -346,7 +346,7 @@ export default function ProfileScreen() {
           OTA). Bump BUILD_TAG each build; `embedded` = running the binary's
           bundled JS (no OTA applied yet). */}
       <Text style={styles.buildMarker} selectable>
-        {`build wk2-auth-offline · ${Updates.isEmbeddedLaunch ? 'embedded' : (Updates.updateId?.slice(0, 8) ?? 'ota')}\n${diagLine}`}
+        {`build wk2-profilecache · ${Updates.isEmbeddedLaunch ? 'embedded' : (Updates.updateId?.slice(0, 8) ?? 'ota')}\n${diagLine}`}
       </Text>
     </ScrollView>
   );

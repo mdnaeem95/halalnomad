@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import { AppState } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Session, User } from '@supabase/supabase-js';
 import { supabase, readPersistedSession } from '../lib/supabase';
 import { setSentryUser } from '../lib/sentry';
@@ -25,6 +26,39 @@ const AuthContext = createContext<AuthState | null>(null);
 // stitch fires once (onAuthStateChange also fires on token refresh, where
 // re-aliasing would be wrong). identify() is idempotent so it can repeat.
 let analyticsAliasedFor: string | null = null;
+
+// The profile is a network fetch, so without a cache it's null on an offline
+// cold-start — which made the Profile screen (`!user || !profile`) show the
+// signed-out UI even though the session was valid. Cache it (AsyncStorage, same
+// store as the query cache) so a signed-in traveller sees their profile offline.
+const PROFILE_CACHE_KEY = 'halalnomad-profile';
+
+async function persistCachedProfile(p: UserProfile): Promise<void> {
+  try {
+    await AsyncStorage.setItem(PROFILE_CACHE_KEY, JSON.stringify(p));
+  } catch {
+    // best-effort — a failed cache write just means no offline profile
+  }
+}
+
+async function loadCachedProfile(userId: string): Promise<UserProfile | null> {
+  try {
+    const raw = await AsyncStorage.getItem(PROFILE_CACHE_KEY);
+    if (!raw) return null;
+    const p = JSON.parse(raw) as UserProfile;
+    return p?.id === userId ? p : null; // ignore a stale cache from another user
+  } catch {
+    return null;
+  }
+}
+
+async function clearCachedProfile(): Promise<void> {
+  try {
+    await AsyncStorage.removeItem(PROFILE_CACHE_KEY);
+  } catch {
+    // ignore
+  }
+}
 
 export function getTierForPoints(points: number): ContributorTier {
   if (points >= TIER_THRESHOLDS.legend) return 'legend';
@@ -68,6 +102,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         total_days_active: data.total_days_active ?? 0,
       };
       setProfile(loaded);
+      void persistCachedProfile(loaded); // keep the offline copy fresh
       if (syncAnalytics) {
         setPersonProperties(personPropertiesFromProfile(loaded));
         // Re-register the tier super-property now that the profile is loaded.
@@ -113,6 +148,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     (async () => {
       let { data: { session } } = await supabase.auth.getSession();
       if (!session) session = await readPersistedSession();
+      if (!mounted) return;
+      // Hydrate the cached profile first so a signed-in user never flashes the
+      // signed-out UI offline; fetchProfile() in handleSession refreshes online.
+      if (session?.user) {
+        const cached = await loadCachedProfile(session.user.id);
+        if (cached && mounted) setProfile(cached);
+      }
       if (!mounted) return;
       handleSession(session, true);
       setIsLoading(false);
@@ -168,6 +210,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const { error } = await supabase.auth.signOut();
     if (error) throw error;
     setProfile(null);
+    void clearCachedProfile();
   }
 
   async function refreshProfile() {
