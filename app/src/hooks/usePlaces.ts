@@ -25,7 +25,12 @@ import { CuisineType, HalalLevel, LatLng, Place, Verification } from '../types';
 
 export const placeKeys = {
   all: ['places'] as const,
-  nearby: (lat: number, lng: number) => ['places', 'nearby', lat, lng] as const,
+  // Round coords to ~1 km buckets so the key is stable: getCurrentPositionAsync
+  // returns slightly different coords every call, and an exact-coord key would
+  // never match the persisted cache — breaking offline "nearby". The queryFn
+  // still fetches/sorts with the exact location.
+  nearby: (lat: number, lng: number) =>
+    ['places', 'nearby', Math.round(lat * 100) / 100, Math.round(lng * 100) / 100] as const,
   detail: (id: string) => ['places', 'detail', id] as const,
   search: (query: string, cuisine?: CuisineType | null) =>
     ['places', 'search', query, cuisine] as const,
