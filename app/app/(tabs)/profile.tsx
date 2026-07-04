@@ -2,6 +2,7 @@ import React from 'react';
 import { Linking, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import * as Updates from 'expo-updates';
 import { router } from 'expo-router';
+import { authDiagnostics } from '../../src/lib/supabase';
 import { Ionicons } from '@expo/vector-icons';
 import { useTranslation } from 'react-i18next';
 import { useAuth } from '../../src/hooks/useAuth';
@@ -35,6 +36,15 @@ export default function ProfileScreen() {
   const { isPremium } = usePremium();
   const { colors: c, colorScheme, setColorScheme } = useTheme();
   const styles = React.useMemo(() => createStyles(c), [c]);
+
+  // TEMP auth diagnostic (remove after debugging).
+  const [diag, setDiag] = React.useState('');
+  React.useEffect(() => {
+    authDiagnostics()
+      .then(setDiag)
+      .catch((e) => setDiag('diag-err:' + String(e).slice(0, 40)));
+  }, []);
+  const diagLine = `u=${user?.id?.slice(0, 8) ?? 'null'} ${diag}`;
 
   if (!user || !profile) {
     return (
@@ -85,6 +95,11 @@ export default function ProfileScreen() {
             )}
           </View>
         </View>
+
+        {/* TEMP auth diagnostic (remove after debugging) */}
+        <Text style={styles.buildMarker} selectable>
+          {`build wk2-auth-offline\n${diagLine}`}
+        </Text>
       </View>
     );
   }
@@ -330,8 +345,8 @@ export default function ProfileScreen() {
       {/* Build marker — confirms which JS bundle is live (esp. after a preview
           OTA). Bump BUILD_TAG each build; `embedded` = running the binary's
           bundled JS (no OTA applied yet). */}
-      <Text style={styles.buildMarker}>
-        {`build wk2-auth-offline · ${Updates.isEmbeddedLaunch ? 'embedded' : (Updates.updateId?.slice(0, 8) ?? 'ota')}`}
+      <Text style={styles.buildMarker} selectable>
+        {`build wk2-auth-offline · ${Updates.isEmbeddedLaunch ? 'embedded' : (Updates.updateId?.slice(0, 8) ?? 'ota')}\n${diagLine}`}
       </Text>
     </ScrollView>
   );
