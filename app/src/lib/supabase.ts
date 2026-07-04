@@ -41,36 +41,3 @@ export async function readPersistedSession(): Promise<Session | null> {
     return null;
   }
 }
-
-/**
- * TEMP diagnostic (remove after debugging offline-auth). Surfaces, on-device,
- * the exact auth/storage state so we can see whether the session is persisted,
- * whether getSession sees it, whether our fallback recovers it, and whether
- * SecureStore round-trips at all. Rendered on the Profile screen footer.
- */
-export async function authDiagnostics(): Promise<string> {
-  let raw: string | null = null;
-  let readErr = '';
-  try {
-    raw = await secureStorageAdapter.getItem(AUTH_STORAGE_KEY);
-  } catch (e) {
-    readErr = String((e as Error)?.message ?? e).slice(0, 30);
-  }
-  let sess = 'null';
-  try {
-    const { data } = await supabase.auth.getSession();
-    sess = data.session?.user?.id?.slice(0, 8) ?? 'null';
-  } catch (e) {
-    sess = 'err:' + String((e as Error)?.message ?? e).slice(0, 20);
-  }
-  const fallback = (await readPersistedSession()) ? 'found' : 'null';
-  let rt = '';
-  try {
-    await secureStorageAdapter.setItem('diag_rt', 'x');
-    rt = (await secureStorageAdapter.getItem('diag_rt')) === 'x' ? 'ok' : 'fail';
-  } catch (e) {
-    rt = 'err:' + String((e as Error)?.message ?? e).slice(0, 20);
-  }
-  const rawInfo = raw ? `${raw.length}b` : readErr || 'null';
-  return `key=…${AUTH_STORAGE_KEY.slice(-18)} raw=${rawInfo} getSession=${sess} fallback=${fallback} rt=${rt}`;
-}

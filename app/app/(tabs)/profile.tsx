@@ -1,9 +1,6 @@
 import React from 'react';
 import { Linking, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
-import * as Updates from 'expo-updates';
 import { router } from 'expo-router';
-import { authDiagnostics } from '../../src/lib/supabase';
-import { queryClient } from '../../src/lib/query-client';
 import { Ionicons } from '@expo/vector-icons';
 import { useTranslation } from 'react-i18next';
 import { useAuth } from '../../src/hooks/useAuth';
@@ -37,22 +34,6 @@ export default function ProfileScreen() {
   const { isPremium } = usePremium();
   const { colors: c, colorScheme, setColorScheme } = useTheme();
   const styles = React.useMemo(() => createStyles(c), [c]);
-
-  // TEMP auth diagnostic (remove after debugging).
-  const [diag, setDiag] = React.useState('');
-  React.useEffect(() => {
-    authDiagnostics()
-      .then(setDiag)
-      .catch((e) => setDiag('diag-err:' + String(e).slice(0, 40)));
-  }, []);
-  // TEMP: is the persisted React Query cache restoring offline?
-  const cacheEntries = queryClient.getQueryCache().getAll();
-  const hasCoverage = !!queryClient.getQueryData(['places', 'countries', 'v2']);
-  const hasNearby = cacheEntries.some(
-    (q) => q.queryKey[0] === 'places' && q.queryKey[1] === 'nearby' && q.state.data
-  );
-  const cacheDiag = `qc=${cacheEntries.length} cov=${hasCoverage ? 'y' : 'n'} near=${hasNearby ? 'y' : 'n'}`;
-  const diagLine = `u=${user?.id?.slice(0, 8) ?? 'null'} p=${profile ? 'y' : 'n'} ${cacheDiag} ${diag}`;
 
   if (!user || !profile) {
     return (
@@ -103,11 +84,6 @@ export default function ProfileScreen() {
             )}
           </View>
         </View>
-
-        {/* TEMP auth diagnostic (remove after debugging) */}
-        <Text style={styles.buildMarker} selectable>
-          {`build wk2-browsewarm\n${diagLine}`}
-        </Text>
       </View>
     );
   }
@@ -349,13 +325,6 @@ export default function ProfileScreen() {
           <Text style={styles.legalLink}>Privacy Policy</Text>
         </Pressable>
       </View>
-
-      {/* Build marker — confirms which JS bundle is live (esp. after a preview
-          OTA). Bump BUILD_TAG each build; `embedded` = running the binary's
-          bundled JS (no OTA applied yet). */}
-      <Text style={styles.buildMarker} selectable>
-        {`build wk2-browsewarm · ${Updates.isEmbeddedLaunch ? 'embedded' : (Updates.updateId?.slice(0, 8) ?? 'ota')}\n${diagLine}`}
-      </Text>
     </ScrollView>
   );
 }
@@ -581,13 +550,6 @@ const createStyles = (c: AppColors) => StyleSheet.create({
   legalDot: {
     ...typography.caption,
     color: c.textTertiary,
-  },
-  buildMarker: {
-    ...typography.caption,
-    color: c.textTertiary,
-    textAlign: 'center',
-    paddingBottom: spacing.lg,
-    opacity: 0.6,
   },
   themeToggle: {
     flexDirection: 'row',
