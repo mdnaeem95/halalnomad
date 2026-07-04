@@ -16,7 +16,9 @@ import { router } from 'expo-router';
 import * as Haptics from 'expo-haptics';
 import { Ionicons } from '@expo/vector-icons';
 import { useLocation } from '../../src/hooks/useLocation';
-import { useNearbyPlaces } from '../../src/hooks/usePlaces';
+import { placeKeys, useNearbyPlaces } from '../../src/hooks/usePlaces';
+import { queryClient } from '../../src/lib/query-client';
+import { fetchCountriesWithCities } from '../../src/services/places';
 import { useTheme } from '../../src/hooks/useTheme';
 import { useAppStore } from '../../src/stores/app-store';
 import { Place } from '../../src/types';
@@ -42,6 +44,17 @@ export default function ExploreScreen() {
   const { data: places = [], isLoading, refetch, isRefetching } = useNearbyPlaces(location);
   const { colors: c, halalLevelColors } = useTheme();
   const styles = React.useMemo(() => createStyles(c), [c]);
+
+  // Warm the Browse coverage cache from the home screen so Browse works offline
+  // even if the user never opened it online (offline-first). No-op offline
+  // (networkMode) and cheap when already cached (1h staleTime).
+  React.useEffect(() => {
+    queryClient.prefetchQuery({
+      queryKey: placeKeys.countriesWithCities(),
+      queryFn: fetchCountriesWithCities,
+      staleTime: 60 * 60 * 1000,
+    });
+  }, []);
   const viewMode = useAppStore((s) => s.exploreViewMode);
   const setViewMode = useAppStore((s) => s.setExploreViewMode);
   const mapRef = useRef<MapView>(null);

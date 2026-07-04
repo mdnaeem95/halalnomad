@@ -106,7 +106,7 @@ export default function ProfileScreen() {
 
         {/* TEMP auth diagnostic (remove after debugging) */}
         <Text style={styles.buildMarker} selectable>
-          {`build wk2-offlinedata\n${diagLine}`}
+          {`build wk2-browsewarm\n${diagLine}`}
         </Text>
       </View>
     );
@@ -354,7 +354,7 @@ export default function ProfileScreen() {
           OTA). Bump BUILD_TAG each build; `embedded` = running the binary's
           bundled JS (no OTA applied yet). */}
       <Text style={styles.buildMarker} selectable>
-        {`build wk2-offlinedata · ${Updates.isEmbeddedLaunch ? 'embedded' : (Updates.updateId?.slice(0, 8) ?? 'ota')}\n${diagLine}`}
+        {`build wk2-browsewarm · ${Updates.isEmbeddedLaunch ? 'embedded' : (Updates.updateId?.slice(0, 8) ?? 'ota')}\n${diagLine}`}
       </Text>
     </ScrollView>
   );
