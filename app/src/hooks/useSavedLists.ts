@@ -12,7 +12,7 @@
  */
 
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { fetchSavedLists, fetchSavedPlaceIds } from '../services/saved-lists';
+import { fetchSavedLists, fetchSavedPlaceIds, fetchSavedListPlaceCounts } from '../services/saved-lists';
 import { enqueue, drainWriteQueue } from '../lib/write-queue';
 import { useAuth } from './useAuth';
 import { uuidv4 } from '../lib/uuid';
@@ -51,6 +51,17 @@ export function useSavedPlaceIds() {
   return useQuery({
     queryKey: savedPlaceKeys.ids(user?.id ?? 'anon'),
     queryFn: () => fetchSavedPlaceIds(),
+    enabled: !!user,
+  });
+}
+
+/** Per-list place counts (list_id → count). Keyed under 'saved-places' so the
+ *  write-queue's onQueueIdle invalidation refreshes it after any place add. */
+export function useSavedListCounts() {
+  const { user } = useAuth();
+  return useQuery({
+    queryKey: [...savedPlaceKeys.all, 'counts', user?.id ?? 'anon'] as const,
+    queryFn: () => fetchSavedListPlaceCounts(),
     enabled: !!user,
   });
 }

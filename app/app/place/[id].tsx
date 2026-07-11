@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import {
+  AccessibilityInfo,
   Linking,
   Pressable,
   ScrollView,
@@ -9,6 +10,7 @@ import {
 } from 'react-native';
 import { Image } from 'expo-image';
 import * as Haptics from 'expo-haptics';
+import { useTranslation } from 'react-i18next';
 import { useLocalSearchParams, router } from 'expo-router';
 import * as Clipboard from 'expo-clipboard';
 import { Ionicons } from '@expo/vector-icons';
@@ -103,6 +105,7 @@ function buildExternalSearchUrl(platform: ExternalPlatform, place: Place): strin
 
 export default function PlaceDetailScreen() {
   const { id, from } = useLocalSearchParams<{ id: string; from?: string }>();
+  const { t } = useTranslation();
   const { user, refreshProfile } = useAuth();
   const { location } = useLocation();
   const consumePlaceView = useAppStore((s) => s.consumePlaceView);
@@ -212,8 +215,8 @@ export default function PlaceDetailScreen() {
       setDialog({
         visible: true,
         variant: 'info',
-        title: 'Sign in required',
-        message: 'Please sign in to save places to a trip.',
+        title: t('trips.signInToSaveTitle'),
+        message: t('trips.signInToSaveMessage'),
         actions: [
           { label: 'Sign In', onPress: () => { closeDialog(); router.push('/auth'); }, style: 'primary' },
           { label: 'Cancel', onPress: closeDialog, style: 'cancel' },
@@ -223,16 +226,20 @@ export default function PlaceDetailScreen() {
     }
     // Wait for the trips list to resolve so we don't create a duplicate default.
     if (!saveToTrip.ready) return;
+    // Idempotent at the join PK — reflect "already saved" in the UI instead of
+    // a second toast / a duplicate.
     if (isSaved) {
-      showToast('Already in your trip', 'info');
+      showToast(t('trips.alreadySaved'), 'info');
       return;
     }
     try {
       const { title } = saveToTrip.save(place);
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-      showToast(`Saved to ${title}`);
+      showToast(t('trips.savedToast', { name: title }));
+      // Announce the state change for VoiceOver users.
+      AccessibilityInfo.announceForAccessibility(t('trips.a11ySavedAnnounce', { name: title }));
     } catch {
-      showToast('Could not save — please try again', 'error');
+      showToast(t('trips.saveError'), 'error');
     }
   }
 
@@ -601,8 +608,8 @@ export default function PlaceDetailScreen() {
             onPress={handleSave}
             disabled={saveToTrip.isPending || !saveToTrip.ready}
             accessibilityRole="button"
-            accessibilityLabel={isSaved ? 'Saved to your trip' : 'Save this place to a trip'}
-            accessibilityState={{ disabled: saveToTrip.isPending || !saveToTrip.ready }}
+            accessibilityLabel={isSaved ? t('trips.savedToTrip') : t('trips.saveToTrip')}
+            accessibilityState={{ disabled: saveToTrip.isPending || !saveToTrip.ready, selected: isSaved }}
           >
             <Ionicons
               name={isSaved ? 'bookmark' : 'bookmark-outline'}
@@ -610,7 +617,7 @@ export default function PlaceDetailScreen() {
               color={c.primaryLight}
             />
             <Text style={[styles.saveButtonText, { color: c.primaryLight }]}>
-              {isSaved ? 'Saved to trip' : 'Save to a trip'}
+              {isSaved ? t('trips.savedToTrip') : t('trips.saveToTrip')}
             </Text>
           </Pressable>
 

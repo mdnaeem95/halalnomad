@@ -19,6 +19,7 @@ import { useAuth } from '../src/hooks/useAuth';
 import {
   LIST_SOFT_CAP,
   useSavedLists,
+  useSavedListCounts,
   useCreateList,
   useRenameList,
   useDeleteList,
@@ -35,9 +36,14 @@ export default function TripsScreen() {
   const { user } = useAuth();
 
   const { data: lists, isLoading } = useSavedLists();
+  const { data: counts } = useSavedListCounts();
   const createList = useCreateList();
   const renameList = useRenameList();
   const deleteList = useDeleteList();
+
+  const placeCountFor = (id: string) => counts?.[id] ?? 0;
+  const countLabel = (n: number) =>
+    n === 0 ? t('trips.placeCount_zero') : t('trips.placeCount', { count: n });
 
   const [editor, setEditor] = useState<Editor>(null);
   const [draft, setDraft] = useState('');
@@ -80,18 +86,25 @@ export default function TripsScreen() {
   }
 
   function confirmDelete(list: SavedList) {
-    Alert.alert(
-      t('trips.deleteTitle'),
-      t('trips.deleteMessage', { name: list.name }),
-      [
-        { text: t('trips.cancel'), style: 'cancel' },
-        {
-          text: t('trips.delete'),
-          style: 'destructive',
-          onPress: () => deleteList.mutate({ id: list.id, placeCount: 0 }),
-        },
-      ]
-    );
+    const n = placeCountFor(list.id);
+    const message =
+      n > 0
+        ? t('trips.deleteWithCount', { name: list.name, count: n })
+        : t('trips.deleteMessage', { name: list.name });
+    Alert.alert(t('trips.deleteTitle'), message, [
+      { text: t('trips.cancel'), style: 'cancel' },
+      {
+        text: t('trips.delete'),
+        style: 'destructive',
+        onPress: () => deleteList.mutate({ id: list.id, placeCount: n }),
+      },
+    ]);
+  }
+
+  // Row tap has no destination yet (list detail is M2) — surface that instead
+  // of a silent dead-end.
+  function onRowPress(list: SavedList) {
+    Alert.alert(list.name, t('trips.comingSoon'));
   }
 
   // Header "+" — only meaningful when signed in.
@@ -143,31 +156,57 @@ export default function TripsScreen() {
           // existing rows and pushes a newly-prepended trip above the viewport.
           // We sort newest-first, so the new trip must show at the top instead.
           maintainVisibleContentPosition={{ disabled: true }}
-          renderItem={({ item }) => (
-            <View style={styles.row}>
-              <View style={styles.rowMain}>
-                <Text style={styles.rowName} numberOfLines={1}>
-                  {item.name}
-                </Text>
+          renderItem={({ item }) => {
+            const n = placeCountFor(item.id);
+            // A11y: announce name + place count + "default" where true.
+            const a11yLabel = [
+              item.name,
+              countLabel(n),
+              item.is_default ? t('trips.defaultBadge') : null,
+            ]
+              .filter(Boolean)
+              .join(', ');
+            return (
+              <View style={styles.row}>
+                <Pressable
+                  style={styles.rowMain}
+                  onPress={() => onRowPress(item)}
+                  accessibilityRole="button"
+                  accessibilityLabel={a11yLabel}
+                >
+                  <View style={styles.rowNameLine}>
+                    <Text style={styles.rowName} numberOfLines={1}>
+                      {item.name}
+                    </Text>
+                    {item.is_default && (
+                      <View style={styles.defaultBadge}>
+                        <Text style={styles.defaultBadgeText}>{t('trips.defaultBadge')}</Text>
+                      </View>
+                    )}
+                  </View>
+                  <Text style={styles.rowSubtitle}>{countLabel(n)}</Text>
+                </Pressable>
+                <Pressable
+                  onPress={() => openRename(item)}
+                  hitSlop={10}
+                  style={styles.rowAction}
+                  accessibilityRole="button"
+                  accessibilityLabel={t('trips.rename') + ' ' + item.name}
+                >
+                  <Ionicons name="pencil-outline" size={20} color={c.textSecondary} />
+                </Pressable>
+                <Pressable
+                  onPress={() => confirmDelete(item)}
+                  hitSlop={10}
+                  style={styles.rowAction}
+                  accessibilityRole="button"
+                  accessibilityLabel={t('trips.delete') + ' ' + item.name}
+                >
+                  <Ionicons name="trash-outline" size={20} color={c.error} />
+                </Pressable>
               </View>
-              <Pressable
-                onPress={() => openRename(item)}
-                hitSlop={8}
-                style={styles.rowAction}
-                accessibilityLabel={t('trips.rename')}
-              >
-                <Ionicons name="pencil-outline" size={20} color={c.textSecondary} />
-              </Pressable>
-              <Pressable
-                onPress={() => confirmDelete(item)}
-                hitSlop={8}
-                style={styles.rowAction}
-                accessibilityLabel={t('trips.delete')}
-              >
-                <Ionicons name="trash-outline" size={20} color={c.error} />
-              </Pressable>
-            </View>
-          )}
+            );
+          }}
         />
       )}
 
@@ -187,7 +226,13 @@ export default function TripsScreen() {
               autoFocus
               returnKeyType="done"
               onSubmitEditing={submitEditor}
+              accessibilityLabel={editor?.mode === 'rename' ? t('trips.renameTitle') : t('trips.newTrip')}
             />
+            {/* Live counter — nears the DB's 80-char CHECK; input is also
+                hard-capped by maxLength so a violation never reaches Postgres. */}
+            <Text style={styles.counter}>
+              {t('trips.nameCounter', { count: draft.length, max: LIST_NAME_MAX })}
+            </Text>
             <View style={styles.cardActions}>
               <Pressable style={styles.secondaryButton} onPress={() => setEditor(null)}>
                 <Text style={styles.secondaryButtonText}>{t('trips.cancel')}</Text>
@@ -230,9 +275,20 @@ const createStyles = (c: AppColors) =>
       paddingHorizontal: 16,
       marginBottom: 10,
     },
-    rowMain: { flex: 1 },
-    rowName: { fontSize: 16, fontWeight: '600', color: c.textPrimary },
-    rowAction: { padding: 6, marginLeft: 4 },
+    rowMain: { flex: 1, paddingVertical: 2 },
+    rowNameLine: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+    rowName: { fontSize: 16, fontWeight: '600', color: c.textPrimary, flexShrink: 1 },
+    rowSubtitle: { fontSize: 13, color: c.textSecondary, marginTop: 2 },
+    defaultBadge: {
+      backgroundColor: c.primaryLight + '22',
+      borderRadius: 6,
+      paddingHorizontal: 6,
+      paddingVertical: 2,
+    },
+    defaultBadgeText: { fontSize: 11, fontWeight: '700', color: c.primary },
+    // ≥44pt tap target (12 pad + 20 icon = 44) for the row action buttons.
+    rowAction: { padding: 12, marginLeft: 2 },
+    counter: { fontSize: 12, color: c.textTertiary, textAlign: 'right', marginTop: 6 },
     primaryButton: {
       backgroundColor: c.primary,
       paddingVertical: 12,

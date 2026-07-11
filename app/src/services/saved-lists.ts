@@ -108,6 +108,19 @@ export async function fetchSavedPlaceIds(): Promise<string[]> {
   return [...new Set((data ?? []).map((r) => r.place_id as string))];
 }
 
+/** Per-list place counts (list_id → count). Powers the My Trips place-count
+ *  subtitle, the delete-confirm copy, and the A11y row label. RLS-scoped. */
+export async function fetchSavedListPlaceCounts(): Promise<Record<string, number>> {
+  const { data, error } = await supabase.from('saved_list_places').select('list_id');
+  if (error) throw error;
+  const counts: Record<string, number> = {};
+  for (const r of data ?? []) {
+    const id = r.list_id as string;
+    counts[id] = (counts[id] ?? 0) + 1;
+  }
+  return counts;
+}
+
 /**
  * Wire the durable write-queue handlers to the idempotent service calls.
  * Call this once at app launch BEFORE initWriteQueue() so a launch-drain has
