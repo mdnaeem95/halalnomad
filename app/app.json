@@ -8,11 +8,6 @@
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
     "scheme": "halalnomad",
-    "splash": {
-      "image": "./assets/splash-icon.png",
-      "resizeMode": "contain",
-      "backgroundColor": "#1B5E20"
-    },
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.halalnomad.app",
@@ -52,16 +47,7 @@
       [
         "expo-splash-screen",
         {
-          "backgroundColor": "#1B5E20",
-          "image": "./assets/splash-icon.png",
-          "imageWidth": 200,
-          "resizeMode": "contain",
-          "android": {
-            "image": "./assets/splash-android-foreground.png",
-            "backgroundColor": "#1B5E20",
-            "imageWidth": 288,
-            "resizeMode": "contain"
-          }
+          "backgroundColor": "#1B5E20"
         }
       ],
       [
