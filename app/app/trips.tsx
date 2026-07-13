@@ -101,10 +101,8 @@ export default function TripsScreen() {
     ]);
   }
 
-  // Row tap has no destination yet (list detail is M2) — surface that instead
-  // of a silent dead-end.
   function onRowPress(list: SavedList) {
-    Alert.alert(list.name, t('trips.comingSoon'));
+    router.push(`/trip/${list.id}`);
   }
 
   // Header "+" — only meaningful when signed in.

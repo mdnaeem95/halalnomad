@@ -12,13 +12,18 @@
  */
 
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { fetchSavedLists, fetchSavedPlaceIds, fetchSavedListPlaceCounts } from '../services/saved-lists';
+import {
+  fetchSavedLists,
+  fetchSavedPlaceIds,
+  fetchSavedListPlaceCounts,
+  fetchListPlaces,
+} from '../services/saved-lists';
 import { enqueue, drainWriteQueue } from '../lib/write-queue';
 import { useAuth } from './useAuth';
 import { uuidv4 } from '../lib/uuid';
 import { captureError } from '../lib/sentry';
 import { track, EVENTS } from '../lib/analytics';
-import { Place, SavedList } from '../types';
+import { ListPlace, Place, SavedList } from '../types';
 
 // v1 soft cap. Enforced client-side (the screen disables create at the cap and
 // the create() helper throws LIST_CAP_REACHED as a backstop). No server CHECK —
@@ -33,6 +38,9 @@ export const savedListKeys = {
 export const savedPlaceKeys = {
   all: ['saved-places'] as const,
   ids: (userId: string) => ['saved-places', userId] as const,
+  // Keyed under 'saved-places' so the write-queue's onQueueIdle invalidation
+  // (which invalidates the whole 'saved-places' family) refreshes it too.
+  listPlaces: (listId: string) => ['saved-places', 'list', listId] as const,
 };
 
 export function useSavedLists() {
@@ -63,6 +71,58 @@ export function useSavedListCounts() {
     queryKey: [...savedPlaceKeys.all, 'counts', user?.id ?? 'anon'] as const,
     queryFn: () => fetchSavedListPlaceCounts(),
     enabled: !!user,
+  });
+}
+
+/** The places inside a trip, ordered by position ASC. One joined query →
+ *  one persisted cache entry, so a trip opened online renders offline. */
+export function useListPlaces(listId: string | undefined) {
+  return useQuery({
+    queryKey: savedPlaceKeys.listPlaces(listId ?? ''),
+    queryFn: () => fetchListPlaces(listId!),
+    enabled: !!listId,
+  });
+}
+
+export function useRemovePlace() {
+  const queryClient = useQueryClient();
+  const { user } = useAuth();
+
+  return useMutation({
+    mutationFn: async (vars: { listId: string; placeId: string }) => {
+      await enqueue('place_remove', `${vars.listId}:${vars.placeId}`, {
+        list_id: vars.listId,
+        place_id: vars.placeId,
+      });
+      void drainWriteQueue();
+    },
+    onMutate: async ({ listId, placeId }) => {
+      const listKey = savedPlaceKeys.listPlaces(listId);
+      const countsKey = [...savedPlaceKeys.all, 'counts', user?.id ?? 'anon'] as const;
+      await queryClient.cancelQueries({ queryKey: listKey });
+      const prevList = queryClient.getQueryData<ListPlace[]>(listKey);
+      const prevCounts = queryClient.getQueryData<Record<string, number>>(countsKey);
+      // Drop the row + keep the My Trips count subtitle consistent (cache
+      // update, not a refetch dependency).
+      queryClient.setQueryData<ListPlace[]>(listKey, (old = []) =>
+        old.filter((p) => p.id !== placeId)
+      );
+      queryClient.setQueryData<Record<string, number>>(countsKey, (old = {}) => ({
+        ...old,
+        [listId]: Math.max(0, (old[listId] ?? 1) - 1),
+      }));
+      return { prevList, prevCounts, listKey, countsKey };
+    },
+    onError: (err, _vars, ctx) => {
+      if (ctx?.prevList) queryClient.setQueryData(ctx.listKey, ctx.prevList);
+      if (ctx?.prevCounts) queryClient.setQueryData(ctx.countsKey, ctx.prevCounts);
+      captureError(err as Error, { mutation: 'removePlace' });
+    },
+    onSuccess: (_data, { listId, placeId }) => {
+      track(EVENTS.PLACE_REMOVED_FROM_LIST, { place_id: placeId, list_id: listId });
+    },
+    // Reconciliation (incl. the place-detail "Saved" indicator) fires post-commit
+    // from the write-queue onQueueIdle.
   });
 }
 

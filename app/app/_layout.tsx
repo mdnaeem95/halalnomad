@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { useTranslation } from 'react-i18next';
@@ -123,6 +124,13 @@ function AppStack() {
           }}
         />
         <Stack.Screen
+          name="trip/[id]"
+          options={{
+            title: '',
+            headerBackButtonDisplayMode: 'minimal',
+          }}
+        />
+        <Stack.Screen
           name="place/[id]"
           options={{
             title: '',
@@ -159,17 +167,19 @@ function AppStack() {
 
 export default function RootLayout() {
   return (
-    <PersistQueryClientProvider
-      client={queryClient}
-      persistOptions={{ persister: asyncStoragePersister }}
-    >
-      <NetworkProvider>
-        <AuthProvider>
-          <ErrorBoundary>
-            <AppStack />
-          </ErrorBoundary>
-        </AuthProvider>
-      </NetworkProvider>
-    </PersistQueryClientProvider>
+    <GestureHandlerRootView style={{ flex: 1 }}>
+      <PersistQueryClientProvider
+        client={queryClient}
+        persistOptions={{ persister: asyncStoragePersister }}
+      >
+        <NetworkProvider>
+          <AuthProvider>
+            <ErrorBoundary>
+              <AppStack />
+            </ErrorBoundary>
+          </AuthProvider>
+        </NetworkProvider>
+      </PersistQueryClientProvider>
+    </GestureHandlerRootView>
   );
 }

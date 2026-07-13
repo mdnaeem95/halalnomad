@@ -269,4 +269,8 @@ export interface SavedListPlace {
   day_index: number | null;
 }
 
+// A place as it appears inside a trip — the full place record plus its
+// `position` in the list (for ordering + future drag-reorder).
+export type ListPlace = Place & { position: number };
+
 export type MapProviderType = 'google' | 'amap' | 'apple';

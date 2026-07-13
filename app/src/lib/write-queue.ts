@@ -28,7 +28,8 @@ export type WriteOp =
   | 'list_rename'
   | 'list_delete'
   | 'default_trip_create'
-  | 'place_add';
+  | 'place_add'
+  | 'place_remove';
 
 export interface WriteQueueEntry {
   uid: string; // unique per queue entry — the ack-and-remove key

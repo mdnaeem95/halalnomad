@@ -15,7 +15,7 @@ import { supabase } from '../lib/supabase';
 import { queryClient } from '../lib/query-client';
 import { sanitizeText } from '../lib/sanitize';
 import { registerWriteHandler, onQueueIdle } from '../lib/write-queue';
-import { SavedList } from '../types';
+import { ListPlace, Place, SavedList } from '../types';
 
 export const LIST_NAME_MAX = 80; // matches the saved_lists_name_len CHECK
 
@@ -108,6 +108,33 @@ export async function fetchSavedPlaceIds(): Promise<string[]> {
   return [...new Set((data ?? []).map((r) => r.place_id as string))];
 }
 
+/** The places in a trip, ordered by `position` ASC (insertion order; the same
+ *  key drag-reorder will mutate in Wk3). Joins the full place record so the
+ *  detail screen renders offline from one persisted cache entry. RLS scopes the
+ *  join rows to the owner; places are public-readable. */
+export async function fetchListPlaces(listId: string): Promise<ListPlace[]> {
+  const { data, error } = await supabase
+    .from('saved_list_places')
+    .select('position, places(*)')
+    .eq('list_id', listId)
+    .order('position', { ascending: true });
+  if (error) throw error;
+  return (data ?? [])
+    .filter((r) => r.places)
+    .map((r) => ({ ...(r.places as unknown as Place), position: r.position as number }));
+}
+
+/** Remove a place from a trip. Idempotent — deleting an already-removed
+ *  (list_id, place_id) row is a no-op, so a queue replay never errors. */
+export async function removePlaceFromList(listId: string, placeId: string): Promise<void> {
+  const { error } = await supabase
+    .from('saved_list_places')
+    .delete()
+    .eq('list_id', listId)
+    .eq('place_id', placeId);
+  if (error) throw error;
+}
+
 /** Per-list place counts (list_id → count). Powers the My Trips place-count
  *  subtitle, the delete-confirm copy, and the A11y row label. RLS-scoped. */
 export async function fetchSavedListPlaceCounts(): Promise<Record<string, number>> {
@@ -150,6 +177,9 @@ export function registerSavedListWriteHandlers(): void {
     'place_add',
     (p: { list_id: string; place_id: string; added_at: string }) =>
       addPlaceToList(p.list_id, p.place_id, p.added_at)
+  );
+  registerWriteHandler('place_remove', (p: { list_id: string; place_id: string }) =>
+    removePlaceFromList(p.list_id, p.place_id)
   );
 
   // After the queue fully drains, reconcile both caches with post-commit server

@@ -262,6 +262,27 @@ describe('write-queue — save-to-trip: default create then place add (FIFO)', (
   });
 });
 
+describe('write-queue — place add then remove replays in order (offline)', () => {
+  it('drains place_add before place_remove of the same place, FIFO', async () => {
+    const calls: string[] = [];
+    registerWriteHandler('place_add', async (p: { place_id: string }) => {
+      calls.push(`add:${p.place_id}`);
+    });
+    registerWriteHandler('place_remove', async (p: { place_id: string }) => {
+      calls.push(`remove:${p.place_id}`);
+    });
+
+    onlineManager.setOnline(false);
+    await enqueue('place_add', 'L:P', { list_id: 'L', place_id: 'P', added_at: 't' });
+    await enqueue('place_remove', 'L:P', { list_id: 'L', place_id: 'P' });
+
+    onlineManager.setOnline(true);
+    await drainWriteQueue();
+    expect(calls).toEqual(['add:P', 'remove:P']);
+    expect(await getQueueSnapshot()).toHaveLength(0);
+  });
+});
+
 describe('write-queue — drain is a no-op when empty', () => {
   it('does nothing with an empty queue', async () => {
     const handler = jest.fn();

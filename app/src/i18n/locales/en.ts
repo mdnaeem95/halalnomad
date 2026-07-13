@@ -178,6 +178,14 @@ export default {
     signInToSaveTitle: 'Sign in required',
     signInToSaveMessage: 'Please sign in to save places to a trip.',
     a11ySavedAnnounce: 'Saved to {{name}}',
+    // List detail (M2)
+    remove: 'Remove',
+    removedToast: 'Removed from {{name}}',
+    a11yRemovedAnnounce: 'Removed from {{name}}',
+    detailEmptyTitle: 'No places yet',
+    detailEmptySubtitle: 'Add Halal places to this trip as you find them.',
+    findPlaces: 'Find places',
+    a11yRemoveHint: 'Removes this place from the trip',
   },
 
   // Report warning component
