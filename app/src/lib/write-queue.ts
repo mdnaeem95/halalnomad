@@ -55,9 +55,21 @@ let queue: WriteQueueEntry[] = [];
 let loadPromise: Promise<void> | null = null;
 let draining = false;
 let uidCounter = 0;
+let beforeDrain: (() => Promise<void>) | null = null;
 
 export function registerWriteHandler(op: WriteOp, fn: Handler): void {
   handlers[op] = fn;
+}
+
+/**
+ * Runs once at the start of every (online) drain, before any handler. Used to
+ * refresh the auth session so writes never execute on a stale/expired token —
+ * critical because an RLS-filtered DELETE with no valid `auth.uid()` silently
+ * affects 0 rows (no error), which the queue would then ack as success, losing
+ * the write. If it throws, the drain is skipped and retried next time.
+ */
+export function setBeforeDrain(fn: () => Promise<void>): void {
+  beforeDrain = fn;
 }
 
 /**
@@ -158,6 +170,16 @@ export async function drainWriteQueue(): Promise<void> {
   draining = true;
   let committed = 0;
   try {
+    // Ensure a valid auth session before any write (see setBeforeDrain). Bail
+    // the whole drain if it fails — better to retry than run writes unauthed.
+    if (beforeDrain) {
+      try {
+        await beforeDrain();
+      } catch (e) {
+        captureError(e as Error, { area: 'write-queue.beforeDrain' });
+        return;
+      }
+    }
     // Re-check the head each iteration so items enqueued mid-drain are picked
     // up at the tail and overall ordering is preserved.
     while (queue.length > 0 && onlineManager.isOnline()) {
@@ -236,4 +258,5 @@ export function __resetWriteQueueForTests(): void {
   uidCounter = 0;
   for (const k of Object.keys(handlers) as WriteOp[]) delete handlers[k];
   idleListeners.clear();
+  beforeDrain = null;
 }

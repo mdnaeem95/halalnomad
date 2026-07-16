@@ -5,9 +5,11 @@ import { Swipeable } from 'react-native-gesture-handler';
 import { Ionicons } from '@expo/vector-icons';
 import { Stack, router, useLocalSearchParams } from 'expo-router';
 import { useTranslation } from 'react-i18next';
+import { useQueryClient } from '@tanstack/react-query';
 import { useTheme } from '../../src/hooks/useTheme';
 import { AppColors } from '../../src/constants/theme';
 import { useLocation } from '../../src/hooks/useLocation';
+import { placeKeys } from '../../src/hooks/usePlaces';
 import { useSavedLists, useListPlaces, useRemovePlace } from '../../src/hooks/useSavedLists';
 import { PlaceCard } from '../../src/components/PlaceCard';
 import { Toast } from '../../src/components/AppDialog';
@@ -23,10 +25,20 @@ export default function TripDetailScreen() {
   const styles = useMemo(() => createStyles(c), [c]);
   const { location } = useLocation();
 
+  const queryClient = useQueryClient();
   const { data: lists } = useSavedLists();
   const list = (lists ?? []).find((l) => l.id === id);
   const { data: places, isLoading } = useListPlaces(id);
   const removePlace = useRemovePlace();
+
+  // Seed each place into the place-detail cache so tapping a place opens offline
+  // (place/[id] reads ['places','detail',id], a different key from the join
+  // query). Only fill gaps — never clobber fresher detail data.
+  useEffect(() => {
+    places?.forEach((p) =>
+      queryClient.setQueryData(placeKeys.detail(p.id), (old: unknown) => old ?? p)
+    );
+  }, [places, queryClient]);
 
   const [toast, setToast] = useState({ visible: false, message: '' });
   const swipeRefs = useRef<Record<string, Swipeable | null>>({});

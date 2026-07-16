@@ -14,7 +14,7 @@
 import { supabase } from '../lib/supabase';
 import { queryClient } from '../lib/query-client';
 import { sanitizeText } from '../lib/sanitize';
-import { registerWriteHandler, onQueueIdle } from '../lib/write-queue';
+import { registerWriteHandler, onQueueIdle, setBeforeDrain } from '../lib/write-queue';
 import { ListPlace, Place, SavedList } from '../types';
 
 export const LIST_NAME_MAX = 80; // matches the saved_lists_name_len CHECK
@@ -162,6 +162,12 @@ export async function fetchSavedListPlaceCounts(): Promise<Record<string, number
  * between two queued writes and momentarily dropping the second's optimistic row.
  */
 export function registerSavedListWriteHandlers(): void {
+  // Before any drain, resolve the session — online + expired, getSession()
+  // refreshes the token, so writes (esp. RLS-filtered deletes) never run
+  // unauthed and silently no-op. Prevents an offline remove from resurrecting.
+  setBeforeDrain(async () => {
+    await supabase.auth.getSession();
+  });
   registerWriteHandler(
     'list_create',
     (p: { id: string; user_id: string; name: string; is_default: boolean }) => createSavedList(p)

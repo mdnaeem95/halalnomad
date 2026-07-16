@@ -43,6 +43,7 @@ import {
   drainWriteQueue,
   registerWriteHandler,
   onQueueIdle,
+  setBeforeDrain,
   getQueueSnapshot,
   __resetWriteQueueForTests,
   WriteOp,
@@ -279,6 +280,34 @@ describe('write-queue — place add then remove replays in order (offline)', () 
     onlineManager.setOnline(true);
     await drainWriteQueue();
     expect(calls).toEqual(['add:P', 'remove:P']);
+    expect(await getQueueSnapshot()).toHaveLength(0);
+  });
+});
+
+describe('write-queue — beforeDrain (auth refresh) gates the drain', () => {
+  it('runs beforeDrain before any handler, and bails the drain if it throws', async () => {
+    const order: string[] = [];
+    registerWriteHandler('place_remove', async () => {
+      order.push('handler');
+    });
+
+    // beforeDrain fails (e.g. session refresh unreachable) → no handler runs,
+    // entry stays queued for the next drain.
+    let ok = false;
+    setBeforeDrain(async () => {
+      order.push('beforeDrain');
+      if (!ok) throw new Error('session refresh failed');
+    });
+
+    await enqueue('place_remove', 'L:P', { list_id: 'L', place_id: 'P' });
+    await drainWriteQueue();
+    expect(order).toEqual(['beforeDrain']); // handler never ran
+    expect(await getQueueSnapshot()).toHaveLength(1); // preserved, not lost
+
+    // Session now refreshes → beforeDrain runs, then the handler commits.
+    ok = true;
+    await drainWriteQueue();
+    expect(order).toEqual(['beforeDrain', 'beforeDrain', 'handler']);
     expect(await getQueueSnapshot()).toHaveLength(0);
   });
 });
