@@ -99,9 +99,12 @@ export function useRemovePlace() {
     onMutate: async ({ listId, placeId }) => {
       const listKey = savedPlaceKeys.listPlaces(listId);
       const countsKey = [...savedPlaceKeys.all, 'counts', user?.id ?? 'anon'] as const;
+      const idsKey = savedPlaceKeys.ids(user?.id ?? 'anon');
       await queryClient.cancelQueries({ queryKey: listKey });
+      await queryClient.cancelQueries({ queryKey: idsKey });
       const prevList = queryClient.getQueryData<ListPlace[]>(listKey);
       const prevCounts = queryClient.getQueryData<Record<string, number>>(countsKey);
+      const prevIds = queryClient.getQueryData<string[]>(idsKey);
       // Drop the row + keep the My Trips count subtitle consistent (cache
       // update, not a refetch dependency).
       queryClient.setQueryData<ListPlace[]>(listKey, (old = []) =>
@@ -111,11 +114,27 @@ export function useRemovePlace() {
         ...old,
         [listId]: Math.max(0, (old[listId] ?? 1) - 1),
       }));
-      return { prevList, prevCounts, listKey, countsKey };
+      // Mirror useSaveToTrip's optimistic add: the place-detail "Saved"
+      // indicator must clear immediately (and durably — this key is
+      // persisted, so an offline remove would otherwise stay stale until
+      // the queue drains online). savedPlaceIds is the union across all
+      // lists, so keep the id if another cached trip still contains it.
+      const savedElsewhere = queryClient
+        .getQueriesData<ListPlace[]>({ queryKey: [...savedPlaceKeys.all, 'list'] })
+        .some(
+          ([key, rows]) => key[2] !== listId && (rows ?? []).some((p) => p.id === placeId)
+        );
+      if (!savedElsewhere) {
+        queryClient.setQueryData<string[]>(idsKey, (old = []) =>
+          old.filter((id) => id !== placeId)
+        );
+      }
+      return { prevList, prevCounts, prevIds, listKey, countsKey, idsKey };
     },
     onError: (err, _vars, ctx) => {
       if (ctx?.prevList) queryClient.setQueryData(ctx.listKey, ctx.prevList);
       if (ctx?.prevCounts) queryClient.setQueryData(ctx.countsKey, ctx.prevCounts);
+      if (ctx?.prevIds) queryClient.setQueryData(ctx.idsKey, ctx.prevIds);
       captureError(err as Error, { mutation: 'removePlace' });
     },
     onSuccess: (_data, { listId, placeId }) => {
