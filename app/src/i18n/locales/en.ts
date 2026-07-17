@@ -188,6 +188,13 @@ export default {
     a11yRemoveHint: 'Removes this place from the trip',
   },
 
+  // Display-time Google photos layer (zero-photo places)
+  googlePhotos: {
+    a11yPhoto: 'Photo of {{name}}, from Google',
+    a11yMoreHint: 'Shows more photos',
+    a11yAuthorLink: 'Photo by {{author}}. Opens their Google Maps profile.',
+  },
+
   // Report warning component
   reportWarning: {
     noReports: 'No recent reports',

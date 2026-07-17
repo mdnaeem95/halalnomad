@@ -50,6 +50,12 @@ posthog?.register({
 // EVENT NAMES (centralized to prevent typos)
 // ============================================
 
+// place_viewed.photo_source — which layer supplied the photos the user
+// actually saw: 'community' = our photos[] column, 'google' = the
+// display-time Google layer rendered, 'none' = no photos (including
+// Google fetch failures and the daily quota cap biting).
+export type PhotoSource = 'community' | 'google' | 'none';
+
 export const EVENTS = {
   // Discovery
   PLACE_VIEWED: 'place_viewed',

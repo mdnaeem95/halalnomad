@@ -3,11 +3,13 @@ import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { useTranslation } from 'react-i18next';
+import { defaultShouldDehydrateQuery } from '@tanstack/react-query';
 import { PersistQueryClientProvider } from '@tanstack/react-query-persist-client';
 import * as SplashScreen from 'expo-splash-screen';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { queryClient, asyncStoragePersister } from '../src/lib/query-client';
 import { AuthProvider, useAuth } from '../src/hooks/useAuth';
+import { googlePhotoKeys } from '../src/hooks/useGooglePhotos';
 import { NetworkProvider } from '../src/hooks/useNetwork';
 import { useTheme } from '../src/hooks/useTheme';
 import { useNotifications } from '../src/hooks/useNotifications';
@@ -170,7 +172,17 @@ export default function RootLayout() {
     <GestureHandlerRootView style={{ flex: 1 }}>
       <PersistQueryClientProvider
         client={queryClient}
-        persistOptions={{ persister: asyncStoragePersister }}
+        persistOptions={{
+          persister: asyncStoragePersister,
+          dehydrateOptions: {
+            // Google ToS forbids persisting Places content: photo
+            // queries are session-only, memory-only. Everything else
+            // keeps the default persistence behaviour.
+            shouldDehydrateQuery: (query) =>
+              defaultShouldDehydrateQuery(query) &&
+              query.queryKey[0] !== googlePhotoKeys.all[0],
+          },
+        }}
       >
         <NetworkProvider>
           <AuthProvider>

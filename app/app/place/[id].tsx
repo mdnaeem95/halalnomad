@@ -30,6 +30,7 @@ import {
   PRICE_LABELS,
   SOURCE_LABELS,
 } from '../../src/types';
+import { GooglePlacePhotos } from '../../src/components/GooglePlacePhotos';
 import { HalalBadge } from '../../src/components/HalalBadge';
 import { FeaturedBadge } from '../../src/components/FeaturedBadge';
 import { ReportWarning } from '../../src/components/ReportWarning';
@@ -43,7 +44,13 @@ import {
   spacing,
   typography,
 } from '../../src/constants/theme';
-import { EVENTS, track } from '../../src/lib/analytics';
+import {
+  googlePlaceIdFromSources,
+  useGooglePhotoMeta,
+  useGooglePhotoUri,
+} from '../../src/hooks/useGooglePhotos';
+import { GOOGLE_PHOTO_WIDTH_PX } from '../../src/services/google-photos';
+import { EVENTS, PhotoSource, track } from '../../src/lib/analytics';
 import { normalizePlaceSource } from '../../src/lib/navigation';
 import { useAppStore } from '../../src/stores/app-store';
 
@@ -127,25 +134,87 @@ export default function PlaceDetailScreen() {
   const { isOnCooldown: reportOnCooldown, trigger: triggerReport } = useCooldown(5000);
   const [reviewModalVisible, setReviewModalVisible] = useState(false);
 
-  // place_viewed: fire once per resolved place (keyed on place.id so a
-  // background refetch doesn't re-fire). is_first_view_of_session + the
+  // Google photo layer state — shared query keys with GooglePlacePhotos,
+  // so these hooks dedupe against the component's own fetches (no extra
+  // API calls). Used here only to resolve photo_source for analytics.
+  const googleMeta = useGooglePhotoMeta(place);
+  const heroPhotoName =
+    place && place.photos.length === 0 ? googleMeta.data?.[0]?.name ?? null : null;
+  const heroUriQuery = useGooglePhotoUri(heroPhotoName, GOOGLE_PHOTO_WIDTH_PX, !!heroPhotoName);
+
+  // What photo experience did this view actually get? 'google' only once
+  // the hero media URI resolved (a metadata hit whose media call fails —
+  // e.g. the daily quota cap — is 'none': that's the signal we monitor
+  // to know the cap started biting). null = still resolving.
+  const photoSource: PhotoSource | null = React.useMemo(() => {
+    if (!place) return null;
+    if (place.photos.length > 0) return 'community';
+    if (!googlePlaceIdFromSources(place.sources)) return 'none';
+    if (googleMeta.isError || googleMeta.fetchStatus === 'paused') return 'none';
+    if (!googleMeta.isSuccess) return null;
+    if ((googleMeta.data?.length ?? 0) === 0) return 'none';
+    if (heroUriQuery.isError || heroUriQuery.fetchStatus === 'paused') return 'none';
+    if (!heroUriQuery.isSuccess) return null;
+    return heroUriQuery.data ? 'google' : 'none';
+  }, [
+    place,
+    googleMeta.isSuccess,
+    googleMeta.isError,
+    googleMeta.fetchStatus,
+    googleMeta.data,
+    heroUriQuery.isSuccess,
+    heroUriQuery.isError,
+    heroUriQuery.fetchStatus,
+    heroUriQuery.data,
+  ]);
+
+  // place_viewed: fire once per resolved place (the ref guards against
+  // background refetches re-firing). is_first_view_of_session + the
   // time-to-first-view are read from the per-session store; the timing is
   // only meaningful on the first view, so it's omitted on later views.
-  React.useEffect(() => {
-    if (!place) return;
-    const { isFirstOfSession, secondsSinceStart } = consumePlaceView();
-    track(EVENTS.PLACE_VIEWED, {
-      place_id: place.id,
-      city: place.city ?? null,
-      halal_level: place.halal_level,
-      source_screen: normalizePlaceSource(from),
-      is_first_view_of_session: isFirstOfSession,
-      ...(isFirstOfSession && secondsSinceStart != null
-        ? { time_to_first_view_seconds: secondsSinceStart }
-        : {}),
-    });
+  // Firing waits for photo_source to resolve (typically <1s for the
+  // Google layer, immediate otherwise); the unmount fallback below makes
+  // sure a quick bounce still counts the view.
+  const placeViewedFiredFor = React.useRef<string | null>(null);
+  const firePlaceViewed = React.useCallback(
+    (viewedPlace: Place, source: PhotoSource) => {
+      if (placeViewedFiredFor.current === viewedPlace.id) return;
+      placeViewedFiredFor.current = viewedPlace.id;
+      const { isFirstOfSession, secondsSinceStart } = consumePlaceView();
+      track(EVENTS.PLACE_VIEWED, {
+        place_id: viewedPlace.id,
+        city: viewedPlace.city ?? null,
+        halal_level: viewedPlace.halal_level,
+        source_screen: normalizePlaceSource(from),
+        is_first_view_of_session: isFirstOfSession,
+        photo_source: source,
+        ...(isFirstOfSession && secondsSinceStart != null
+          ? { time_to_first_view_seconds: secondsSinceStart }
+          : {}),
+      });
+    },
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [place?.id]);
+    []
+  );
+
+  React.useEffect(() => {
+    if (!place || photoSource == null) return;
+    firePlaceViewed(place, photoSource);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [place?.id, photoSource]);
+
+  // Unmount fallback: user left before the Google layer resolved — the
+  // view still happened and they saw no photos.
+  const latestPlaceRef = React.useRef<Place | null>(null);
+  latestPlaceRef.current = place ?? null;
+  React.useEffect(
+    () => () => {
+      const p = latestPlaceRef.current;
+      if (p) firePlaceViewed(p, 'none');
+    },
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    []
+  );
 
   // One review per user per place — DB-enforced via UNIQUE(place_id, user_id).
   // Use the already-fetched review list to show the right CTA without an
@@ -400,8 +469,9 @@ export default function PlaceDetailScreen() {
   return (
     <View style={{ flex: 1 }}>
       <ScrollView style={[styles.container, { backgroundColor: c.background }]} contentContainerStyle={styles.content}>
-        {/* Photos */}
-        {place.photos.length > 0 && (
+        {/* Photos — community photos always win; the Google display-time
+            layer only ever fills places with zero community photos. */}
+        {place.photos.length > 0 ? (
           <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.photos}>
             {place.photos.map((url, i) => (
               <Image
@@ -413,6 +483,8 @@ export default function PlaceDetailScreen() {
             />
             ))}
           </ScrollView>
+        ) : (
+          <GooglePlacePhotos place={place} />
         )}
 
         {/* Header */}
