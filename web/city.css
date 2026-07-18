@@ -1,0 +1,220 @@
+/* City pages (/tokyo, /cities) — editorial layout on the brand system:
+   green #1B5E20, cream #F4EFE6, ink #1A1A1A, Inter only, sentence case.
+   Loaded after styles.css; overrides the landing-page look for these pages. */
+
+body.city-page {
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  background: #F4EFE6;
+  color: #1A1A1A;
+}
+
+.city-page .nav {
+  max-width: 860px;
+  margin: 0 auto;
+  padding: 1.25rem 0;
+}
+
+/* Compact green header band (not the landing mega-hero) */
+.city-header {
+  background: linear-gradient(160deg, var(--primary-dark) 0%, var(--primary) 85%);
+  color: #fff;
+  padding: 0 1.5rem 2.75rem;
+}
+
+.city-header .hero-content {
+  max-width: 860px;
+  margin: 0 auto;
+  padding: 1.5rem 0 0;
+  text-align: left;
+}
+
+.city-header h1 {
+  font-size: clamp(1.9rem, 4.5vw, 2.9rem);
+  font-weight: 800;
+  color: #fff;
+}
+
+.city-main {
+  max-width: 860px;
+  margin: 0 auto;
+  padding: 2.5rem 1.5rem 4rem;
+}
+
+.city-main h2 {
+  font-size: clamp(1.4rem, 2.6vw, 1.9rem);
+  margin: 2.75rem 0 0.75rem;
+}
+
+.city-main h3 {
+  font-size: 1.2rem;
+  margin: 2rem 0 0.5rem;
+}
+
+.city-prose p {
+  margin: 0 0 1rem;
+  max-width: 68ch;
+  font-size: 1.04rem;
+}
+
+.city-header .city-prose p {
+  color: rgba(255, 255, 255, 0.94);
+  max-width: 62ch;
+}
+
+.city-header .cta-row {
+  justify-content: flex-start;
+  margin-top: 1.5rem;
+}
+
+.city-header .cta-note {
+  color: rgba(255, 255, 255, 0.85);
+  font-size: 0.92rem;
+  margin-top: 0.75rem;
+}
+
+/* Local script rendered as a first-class sibling, never an afterthought */
+.local {
+  color: inherit;
+  opacity: 0.85;
+  font-weight: 500;
+}
+
+/* Anchor nav for the neighbourhood sections */
+.anchor-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin: 1rem 0 0;
+}
+
+.anchor-row a {
+  background: #fff;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  padding: 0.4rem 0.9rem;
+  font-size: 0.92rem;
+  font-weight: 600;
+}
+
+/* Neighbourhood blocks + place list share the card look */
+.card {
+  background: #fff;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 1.4rem 1.5rem;
+  margin: 1rem 0;
+  box-shadow: var(--shadow-sm);
+}
+
+.card .count-line {
+  color: var(--text-tertiary);
+  font-size: 0.9rem;
+  margin-bottom: 0.65rem;
+}
+
+.mini-places {
+  list-style: none;
+  margin: 0.75rem 0 0;
+  padding: 0;
+}
+
+.mini-places li {
+  padding: 0.45rem 0;
+  border-top: 1px solid var(--border);
+  font-size: 0.98rem;
+}
+
+.mini-places li:first-child {
+  border-top: 0;
+}
+
+/* Top-10 list */
+.place-list {
+  list-style: none;
+  margin: 1rem 0 0;
+  padding: 0;
+  counter-reset: place;
+}
+
+.place-list li {
+  counter-increment: place;
+  background: #fff;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 0.9rem 1.1rem;
+  margin: 0.5rem 0;
+  display: flex;
+  gap: 0.9rem;
+  align-items: baseline;
+}
+
+.place-list li::before {
+  content: counter(place);
+  font-weight: 800;
+  color: var(--primary);
+  min-width: 1.4rem;
+}
+
+.place-name {
+  font-weight: 700;
+}
+
+.place-meta {
+  display: block;
+  color: var(--text-secondary);
+  font-size: 0.9rem;
+  margin-top: 0.15rem;
+}
+
+.badge {
+  display: inline-block;
+  border-radius: 999px;
+  padding: 0.1rem 0.6rem;
+  font-size: 0.78rem;
+  font-weight: 600;
+  vertical-align: 1px;
+  background: #FFF3D6;
+  color: #8A6D1B;
+  border: 1px solid #EAD9A8;
+}
+
+.badge.level-2, .badge.level-3 { background: #E4F0E5; color: #1B5E20; border-color: #C8DFC9; }
+.badge.level-4 { background: var(--primary); color: #fff; border-color: var(--primary); }
+
+/* /cities index */
+.city-list {
+  list-style: none;
+  margin: 1.25rem 0 0;
+  padding: 0;
+}
+
+.city-list li {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  background: #fff;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 0.85rem 1.1rem;
+  margin: 0.5rem 0;
+  font-size: 1.02rem;
+}
+
+.city-list .count {
+  color: var(--text-secondary);
+  font-variant-numeric: tabular-nums;
+}
+
+.city-list a {
+  font-weight: 700;
+}
+
+.soon {
+  color: var(--text-tertiary);
+  font-size: 0.85rem;
+}
+
+.city-page footer {
+  background: transparent;
+  border-top: 1px solid var(--border);
+}
