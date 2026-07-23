@@ -99,13 +99,19 @@ export async function addPlaceToList(
   if (error) throw error;
 }
 
-/** Place ids saved across all of the caller's lists — powers the place-detail
- *  "Saved" indicator. RLS scopes saved_list_places to the owner, so no explicit
- *  user filter is needed. */
-export async function fetchSavedPlaceIds(): Promise<string[]> {
-  const { data, error } = await supabase.from('saved_list_places').select('place_id');
+export interface SavedPlacePair {
+  list_id: string;
+  place_id: string;
+}
+
+/** Every (list_id, place_id) membership row the caller owns — ONE cache entry
+ *  powering both the place-detail "Saved to N trips" state and the save-sheet
+ *  membership checks (correct offline since it's persisted). RLS scopes
+ *  saved_list_places to the owner, so no explicit user filter is needed. */
+export async function fetchSavedPlacePairs(): Promise<SavedPlacePair[]> {
+  const { data, error } = await supabase.from('saved_list_places').select('list_id, place_id');
   if (error) throw error;
-  return [...new Set((data ?? []).map((r) => r.place_id as string))];
+  return (data ?? []) as SavedPlacePair[];
 }
 
 /** The places in a trip, ordered by `position` ASC (insertion order; the same

@@ -14,9 +14,10 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   fetchSavedLists,
-  fetchSavedPlaceIds,
+  fetchSavedPlacePairs,
   fetchSavedListPlaceCounts,
   fetchListPlaces,
+  SavedPlacePair,
 } from '../services/saved-lists';
 import { enqueue, drainWriteQueue } from '../lib/write-queue';
 import { useAuth } from './useAuth';
@@ -37,9 +38,12 @@ export const savedListKeys = {
 
 export const savedPlaceKeys = {
   all: ['saved-places'] as const,
-  ids: (userId: string) => ['saved-places', userId] as const,
-  // Keyed under 'saved-places' so the write-queue's onQueueIdle invalidation
-  // (which invalidates the whole 'saved-places' family) refreshes it too.
+  // All (list_id, place_id) membership rows in one persisted cache entry —
+  // the single source for the "Saved to N trips" state AND the save-sheet
+  // membership checks (Wk2 replaced the old place-id-union key with this;
+  // the union is derived via `select`). Keyed under 'saved-places' so the
+  // write-queue's onQueueIdle invalidation refreshes it too.
+  pairs: (userId: string) => ['saved-places', 'pairs', userId] as const,
   listPlaces: (listId: string) => ['saved-places', 'list', listId] as const,
 };
 
@@ -52,15 +56,20 @@ export function useSavedLists() {
   });
 }
 
-/** Place ids saved across all of the user's trips — for the place-detail
- *  "Saved" indicator. */
-export function useSavedPlaceIds() {
+/** Which of the user's trips contain this place. `listIds` powers the sheet's
+ *  membership checks; `count` powers "Saved to N trips". Renders from the
+ *  persisted pairs cache, so both are correct offline. */
+export function useListMembership(placeId: string | undefined) {
   const { user } = useAuth();
-  return useQuery({
-    queryKey: savedPlaceKeys.ids(user?.id ?? 'anon'),
-    queryFn: () => fetchSavedPlaceIds(),
+  const query = useQuery({
+    queryKey: savedPlaceKeys.pairs(user?.id ?? 'anon'),
+    queryFn: () => fetchSavedPlacePairs(),
     enabled: !!user,
+    select: (pairs: SavedPlacePair[]) =>
+      pairs.filter((p) => p.place_id === placeId).map((p) => p.list_id),
   });
+  const listIds = query.data ?? [];
+  return { ...query, listIds, count: listIds.length };
 }
 
 /** Per-list place counts (list_id → count). Keyed under 'saved-places' so the
@@ -99,12 +108,12 @@ export function useRemovePlace() {
     onMutate: async ({ listId, placeId }) => {
       const listKey = savedPlaceKeys.listPlaces(listId);
       const countsKey = [...savedPlaceKeys.all, 'counts', user?.id ?? 'anon'] as const;
-      const idsKey = savedPlaceKeys.ids(user?.id ?? 'anon');
+      const pairsKey = savedPlaceKeys.pairs(user?.id ?? 'anon');
       await queryClient.cancelQueries({ queryKey: listKey });
-      await queryClient.cancelQueries({ queryKey: idsKey });
+      await queryClient.cancelQueries({ queryKey: pairsKey });
       const prevList = queryClient.getQueryData<ListPlace[]>(listKey);
       const prevCounts = queryClient.getQueryData<Record<string, number>>(countsKey);
-      const prevIds = queryClient.getQueryData<string[]>(idsKey);
+      const prevPairs = queryClient.getQueryData<SavedPlacePair[]>(pairsKey);
       // Drop the row + keep the My Trips count subtitle consistent (cache
       // update, not a refetch dependency).
       queryClient.setQueryData<ListPlace[]>(listKey, (old = []) =>
@@ -114,27 +123,19 @@ export function useRemovePlace() {
         ...old,
         [listId]: Math.max(0, (old[listId] ?? 1) - 1),
       }));
-      // Mirror useSaveToTrip's optimistic add: the place-detail "Saved"
-      // indicator must clear immediately (and durably — this key is
-      // persisted, so an offline remove would otherwise stay stale until
-      // the queue drains online). savedPlaceIds is the union across all
-      // lists, so keep the id if another cached trip still contains it.
-      const savedElsewhere = queryClient
-        .getQueriesData<ListPlace[]>({ queryKey: [...savedPlaceKeys.all, 'list'] })
-        .some(
-          ([key, rows]) => key[2] !== listId && (rows ?? []).some((p) => p.id === placeId)
-        );
-      if (!savedElsewhere) {
-        queryClient.setQueryData<string[]>(idsKey, (old = []) =>
-          old.filter((id) => id !== placeId)
-        );
-      }
-      return { prevList, prevCounts, prevIds, listKey, countsKey, idsKey };
+      // Drop the exact membership pair. The "Saved to N trips" state and the
+      // sheet checks derive from this persisted cache, so an offline remove
+      // clears immediately and durably — and a place saved in another trip
+      // stays "saved" for free (its pair is untouched).
+      queryClient.setQueryData<SavedPlacePair[]>(pairsKey, (old = []) =>
+        old.filter((p) => !(p.list_id === listId && p.place_id === placeId))
+      );
+      return { prevList, prevCounts, prevPairs, listKey, countsKey, pairsKey };
     },
     onError: (err, _vars, ctx) => {
       if (ctx?.prevList) queryClient.setQueryData(ctx.listKey, ctx.prevList);
       if (ctx?.prevCounts) queryClient.setQueryData(ctx.countsKey, ctx.prevCounts);
-      if (ctx?.prevIds) queryClient.setQueryData(ctx.idsKey, ctx.prevIds);
+      if (ctx?.prevPairs) queryClient.setQueryData(ctx.pairsKey, ctx.prevPairs);
       captureError(err as Error, { mutation: 'removePlace' });
     },
     onSuccess: (_data, { listId, placeId }) => {
@@ -186,11 +187,13 @@ export function useCreateList() {
   });
 
   /**
-   * Build the row (client UUID) and fire the optimistic mutation. Throws
-   * synchronously if not signed in or at the soft cap, so the screen can show a
-   * message without a half-applied optimistic state.
+   * Build the row (client UUID) and fire the optimistic mutation. Returns the
+   * row so callers can chain (the save sheet saves the place into the new trip
+   * in the same interaction). Throws synchronously if not signed in or at the
+   * soft cap, so the screen can show a message without a half-applied
+   * optimistic state.
    */
-  function create(name: string, source: CreateSource = 'manual'): void {
+  function create(name: string, source: CreateSource = 'manual'): SavedList {
     if (!user) throw new Error('NOT_AUTHENTICATED');
     const existing = queryClient.getQueryData<SavedList[]>(savedListKeys.list(user.id)) ?? [];
     if (existing.length >= LIST_SOFT_CAP) {
@@ -208,9 +211,35 @@ export function useCreateList() {
       updated_at: now,
     };
     mutation.mutate({ row, source });
+    return row;
   }
 
-  return { ...mutation, create };
+  /** Like create(), but resolves only after the list_create op is durably
+   *  enqueued. The save sheet awaits this before enqueueing the place_add so
+   *  the queue's FIFO order is create-before-add by construction (an add that
+   *  drains before its list exists would FK-fail server-side). */
+  async function createAsync(name: string, source: CreateSource = 'manual'): Promise<SavedList> {
+    if (!user) throw new Error('NOT_AUTHENTICATED');
+    const existing = queryClient.getQueryData<SavedList[]>(savedListKeys.list(user.id)) ?? [];
+    if (existing.length >= LIST_SOFT_CAP) {
+      const e = new Error('LIST_CAP_REACHED');
+      (e as Error & { code?: string }).code = 'LIST_CAP_REACHED';
+      throw e;
+    }
+    const now = new Date().toISOString();
+    const row: SavedList = {
+      id: uuidv4(),
+      user_id: user.id,
+      name: name.trim(),
+      is_default: false,
+      created_at: now,
+      updated_at: now,
+    };
+    await mutation.mutateAsync({ row, source });
+    return row;
+  }
+
+  return { ...mutation, create, createAsync };
 }
 
 export function useRenameList() {
@@ -262,13 +291,22 @@ export function useDeleteList() {
     onMutate: async ({ id }) => {
       if (!user) return {};
       const key = savedListKeys.list(user.id);
+      const pairsKey = savedPlaceKeys.pairs(user.id);
       await queryClient.cancelQueries({ queryKey: key });
+      await queryClient.cancelQueries({ queryKey: pairsKey });
       const prev = queryClient.getQueryData<SavedList[]>(key);
+      const prevPairs = queryClient.getQueryData<SavedPlacePair[]>(pairsKey);
       queryClient.setQueryData<SavedList[]>(key, (old = []) => old.filter((l) => l.id !== id));
-      return { prev, key };
+      // Server-side the join rows cascade with the list; mirror that in the
+      // pairs cache so "Saved to N trips" drops immediately (incl. offline).
+      queryClient.setQueryData<SavedPlacePair[]>(pairsKey, (old = []) =>
+        old.filter((p) => p.list_id !== id)
+      );
+      return { prev, key, prevPairs, pairsKey };
     },
     onError: (err, _vars, ctx) => {
       if (ctx?.prev && ctx?.key) queryClient.setQueryData(ctx.key, ctx.prev);
+      if (ctx?.prevPairs && ctx?.pairsKey) queryClient.setQueryData(ctx.pairsKey, ctx.prevPairs);
       captureError(err as Error, { mutation: 'deleteList' });
     },
     onSuccess: (_data, { id, placeCount }) => {
@@ -317,13 +355,22 @@ export function useSaveToTrip() {
     },
     onMutate: async ({ placeId, listId, isFirst, title }) => {
       if (!user) return {};
-      const placesKey = savedPlaceKeys.ids(user.id);
+      const pairsKey = savedPlaceKeys.pairs(user.id);
+      const countsKey = [...savedPlaceKeys.all, 'counts', user.id] as const;
       const listsKey = savedListKeys.list(user.id);
-      await queryClient.cancelQueries({ queryKey: placesKey });
-      const prevPlaces = queryClient.getQueryData<string[]>(placesKey);
-      queryClient.setQueryData<string[]>(placesKey, (old = []) =>
-        old.includes(placeId) ? old : [...old, placeId]
+      await queryClient.cancelQueries({ queryKey: pairsKey });
+      const prevPairs = queryClient.getQueryData<SavedPlacePair[]>(pairsKey);
+      const prevCounts = queryClient.getQueryData<Record<string, number>>(countsKey);
+      queryClient.setQueryData<SavedPlacePair[]>(pairsKey, (old = []) =>
+        old.some((p) => p.list_id === listId && p.place_id === placeId)
+          ? old
+          : [...old, { list_id: listId, place_id: placeId }]
       );
+      // Keep the My Trips count subtitle in step with the sheet toggle.
+      queryClient.setQueryData<Record<string, number>>(countsKey, (old = {}) => ({
+        ...old,
+        [listId]: (old[listId] ?? 0) + 1,
+      }));
 
       let prevLists: SavedList[] | undefined;
       if (isFirst) {
@@ -340,10 +387,11 @@ export function useSaveToTrip() {
         };
         queryClient.setQueryData<SavedList[]>(listsKey, (old = []) => [row, ...old]);
       }
-      return { prevPlaces, prevLists, placesKey, listsKey };
+      return { prevPairs, prevCounts, prevLists, pairsKey, countsKey, listsKey };
     },
     onError: (err, _vars, ctx) => {
-      if (ctx?.prevPlaces && ctx?.placesKey) queryClient.setQueryData(ctx.placesKey, ctx.prevPlaces);
+      if (ctx?.prevPairs && ctx?.pairsKey) queryClient.setQueryData(ctx.pairsKey, ctx.prevPairs);
+      if (ctx?.prevCounts && ctx?.countsKey) queryClient.setQueryData(ctx.countsKey, ctx.prevCounts);
       if (ctx?.prevLists && ctx?.listsKey) queryClient.setQueryData(ctx.listsKey, ctx.prevLists);
       captureError(err as Error, { mutation: 'saveToTrip' });
     },

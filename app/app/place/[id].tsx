@@ -19,7 +19,8 @@ import { useLocation } from '../../src/hooks/useLocation';
 import { useTheme } from '../../src/hooks/useTheme';
 import { useCooldown } from '../../src/hooks/useCooldown';
 import { useAddReview, usePlace, useReviews, useUserVerifications, useVerifyPlace } from '../../src/hooks/usePlaces';
-import { useSaveToTrip, useSavedPlaceIds } from '../../src/hooks/useSavedLists';
+import { useListMembership, useSavedLists, useSaveToTrip } from '../../src/hooks/useSavedLists';
+import { SaveToTripSheet } from '../../src/components/SaveToTripSheet';
 import { getMapProvider } from '../../src/services/map';
 import {
   CUISINE_LABELS,
@@ -128,8 +129,10 @@ export default function PlaceDetailScreen() {
   const verifyMutation = useVerifyPlace();
   const reviewMutation = useAddReview();
   const saveToTrip = useSaveToTrip();
-  const { data: savedPlaceIds } = useSavedPlaceIds();
-  const isSaved = !!place && (savedPlaceIds ?? []).includes(place.id);
+  const { data: savedLists } = useSavedLists();
+  const { count: savedTripCount } = useListMembership(place?.id);
+  const isSaved = savedTripCount > 0;
+  const [saveSheetVisible, setSaveSheetVisible] = useState(false);
   const { isOnCooldown: verifyOnCooldown, trigger: triggerVerify } = useCooldown(5000);
   const { isOnCooldown: reportOnCooldown, trigger: triggerReport } = useCooldown(5000);
   const [reviewModalVisible, setReviewModalVisible] = useState(false);
@@ -295,10 +298,11 @@ export default function PlaceDetailScreen() {
     }
     // Wait for the trips list to resolve so we don't create a duplicate default.
     if (!saveToTrip.ready) return;
-    // Idempotent at the join PK — reflect "already saved" in the UI instead of
-    // a second toast / a duplicate.
-    if (isSaved) {
-      showToast(t('trips.alreadySaved'), 'info');
+    // Wk2: with ≥1 trip, the sheet owns save AND unsave (membership toggles) —
+    // it doubles as the "which trips is this in?" answer. The zero-trip
+    // first-save stays silent (locked Q1): auto-create the default trip.
+    if ((savedLists?.length ?? 0) > 0) {
+      setSaveSheetVisible(true);
       return;
     }
     try {
@@ -668,9 +672,10 @@ export default function PlaceDetailScreen() {
             </View>
           </View>
 
-          {/* Save to a trip — free (Trip Planning M1). Wk2: saves into the
-              user's default trip, creating it on the first-ever save. The
-              multi-list picker is M2. */}
+          {/* Save to a trip (Trip Planning M2 Wk2). Zero trips: silent
+              first-save into the auto-created default. ≥1 trip: opens the
+              membership-toggle sheet; the label reflects "Saved to N trips"
+              and the count updates optimistically from the pairs cache. */}
           <Pressable
             style={[
               styles.saveButton,
@@ -680,7 +685,12 @@ export default function PlaceDetailScreen() {
             onPress={handleSave}
             disabled={saveToTrip.isPending || !saveToTrip.ready}
             accessibilityRole="button"
-            accessibilityLabel={isSaved ? t('trips.savedToTrip') : t('trips.saveToTrip')}
+            accessibilityLabel={
+              isSaved
+                ? t('trips.savedToTrips', { count: savedTripCount })
+                : t('trips.saveToTrip')
+            }
+            accessibilityHint={(savedLists?.length ?? 0) > 0 ? t('trips.a11yOpensSheet') : undefined}
             accessibilityState={{ disabled: saveToTrip.isPending || !saveToTrip.ready, selected: isSaved }}
           >
             <Ionicons
@@ -689,7 +699,9 @@ export default function PlaceDetailScreen() {
               color={c.primaryLight}
             />
             <Text style={[styles.saveButtonText, { color: c.primaryLight }]}>
-              {isSaved ? t('trips.savedToTrip') : t('trips.saveToTrip')}
+              {isSaved
+                ? t('trips.savedToTrips', { count: savedTripCount })
+                : t('trips.saveToTrip')}
             </Text>
           </Pressable>
 
@@ -804,6 +816,12 @@ export default function PlaceDetailScreen() {
         onClose={() => setReviewModalVisible(false)}
         onSubmit={handleSubmitReview}
         isSubmitting={reviewMutation.isPending}
+      />
+
+      <SaveToTripSheet
+        visible={saveSheetVisible}
+        place={place}
+        onClose={() => setSaveSheetVisible(false)}
       />
 
       <Toast

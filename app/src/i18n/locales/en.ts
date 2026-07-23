@@ -186,6 +186,16 @@ export default {
     detailEmptySubtitle: 'Add Halal places to this trip as you find them.',
     findPlaces: 'Find places',
     a11yRemoveHint: 'Removes this place from the trip',
+    // Save sheet (M2 Wk2)
+    sheetTitle: 'Save to a trip',
+    sheetRowSaved: '{{name}}, saved',
+    sheetRowNotSaved: '{{name}}, not saved',
+    sheetCreateNew: 'Create new trip',
+    sheetCreatePlaceholder: 'Trip name',
+    sheetCreateAdd: 'Create & save',
+    savedToTrips_one: 'Saved to 1 trip',
+    savedToTrips_other: 'Saved to {{count}} trips',
+    a11yOpensSheet: 'Opens the trip picker',
   },
 
   // Display-time Google photos layer (zero-photo places)
