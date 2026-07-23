@@ -123,6 +123,21 @@ function isTransientError(e: unknown): boolean {
   return /network|fetch|timeout|timed out|connection|econn|offline/.test(msg);
 }
 
+/**
+ * A data-integrity failure that can NEVER succeed on retry: the referenced row
+ * doesn't exist (FK violation — e.g. a place_add into a "ghost" list that only
+ * ever existed client-side) or RLS rejects the write outright (checked AFTER
+ * the beforeDrain session refresh, so it's not an auth blip). Retrying blocks
+ * the FIFO head for MAX_ATTEMPTS drains while every queued write behind it —
+ * and the queue-idle reconciliation — silently stalls (the B11 incident,
+ * 2026-07-22). Drop immediately instead; the post-drain reconcile then pulls
+ * server truth and clears the stale optimistic state that caused it.
+ */
+function isPermanentDataError(e: unknown): boolean {
+  const msg = (e instanceof Error ? e.message : String(e)).toLowerCase();
+  return /foreign key|row-level security|violates.*constraint|42501|23503/.test(msg);
+}
+
 /** Append an op. In-memory queue is the in-process source of truth; we persist
  *  the whole array on every change (it's tiny — bounded by the ~10-list cap). */
 export async function enqueue(
@@ -169,6 +184,7 @@ export async function drainWriteQueue(): Promise<void> {
   if (!onlineManager.isOnline()) return;
   draining = true;
   let committed = 0;
+  let dropped = 0;
   try {
     // Ensure a valid auth session before any write (see setBeforeDrain). Bail
     // the whole drain if it fails — better to retry than run writes unauthed.
@@ -180,6 +196,12 @@ export async function drainWriteQueue(): Promise<void> {
         return;
       }
     }
+    // Coalesce dead work for unsynced entities (create→delete chains, rename
+    // folds, add→remove cancels) before touching the network. Safe here: the
+    // `draining` guard means nothing is in-flight, and acked ops are already
+    // gone from the queue. Ops enqueued mid-drain coalesce on the next drain.
+    queue = coalesceQueue(queue);
+    await persist();
     // Re-check the head each iteration so items enqueued mid-drain are picked
     // up at the tail and overall ordering is preserved.
     while (queue.length > 0 && onlineManager.isOnline()) {
@@ -202,6 +224,19 @@ export async function drainWriteQueue(): Promise<void> {
           // next drain. Does not burn an attempt.
           break;
         }
+        if (isPermanentDataError(e)) {
+          // Can never succeed (missing FK target / RLS reject post-refresh).
+          // Drop NOW so it can't block the queue for MAX_ATTEMPTS drains.
+          captureError(e as Error, {
+            area: 'write-queue',
+            op: entry.op,
+            clientId: entry.clientId,
+            dropped: 'permanent-data-error',
+          });
+          await removeByUid(entry.uid);
+          dropped += 1;
+          continue;
+        }
         entry.attempts += 1;
         await persist();
         if (entry.attempts >= MAX_ATTEMPTS) {
@@ -212,6 +247,7 @@ export async function drainWriteQueue(): Promise<void> {
             dropped: 'true',
           });
           await removeByUid(entry.uid); // drop poison; don't block the queue forever
+          dropped += 1;
           continue;
         }
         captureError(e as Error, {
@@ -226,8 +262,11 @@ export async function drainWriteQueue(): Promise<void> {
   } finally {
     draining = false;
   }
-  // Reconcile only once everything pending has committed — never mid-drain.
-  if (committed > 0 && queue.length === 0) {
+  // Reconcile only once everything pending has resolved — never mid-drain.
+  // Drops count too: a drain that discarded dead ops MUST reconcile, or the
+  // optimistic state they created lingers as silent client-server divergence
+  // (the B11 incident — ghost trips survived because idle never fired).
+  if ((committed > 0 || dropped > 0) && queue.length === 0) {
     idleListeners.forEach((fn) => {
       try {
         fn();
@@ -236,6 +275,116 @@ export async function drainWriteQueue(): Promise<void> {
       }
     });
   }
+}
+
+// --- Coalescing (M2 Wk2) ----------------------------------------------------
+//
+// Collapse dead work for UNSYNCED entities before a drain so it never hits the
+// server. An entity is unsynced exactly when its create op is still in the
+// queue (acked ops are removed on commit, so anything present here has not
+// been applied). Runs at drain time only — never touches in-flight or acked
+// ops — and preserves FIFO order for the survivors (drops and in-place payload
+// rewrites only; no reordering).
+
+function entityListId(e: WriteQueueEntry): string | null {
+  const p = e.payload as Record<string, unknown> | null;
+  switch (e.op) {
+    case 'list_create':
+    case 'list_rename':
+    case 'list_delete':
+      return (p?.id as string) ?? null;
+    case 'default_trip_create':
+    case 'place_add':
+    case 'place_remove':
+      return (p?.list_id as string) ?? null;
+    default:
+      return null;
+  }
+}
+
+export function coalesceQueue(entries: WriteQueueEntry[]): WriteQueueEntry[] {
+  const drop = new Set<string>(); // entry uids to drop
+  const isCreate = (e: WriteQueueEntry) =>
+    e.op === 'list_create' || e.op === 'default_trip_create';
+
+  // Rule A — create → … → delete of an unsynced list: the list never existed
+  // server-side, so every op touching it (create, renames, the delete itself,
+  // and place add/removes into it) is dead work.
+  const createdIds = new Set(entries.filter(isCreate).map((e) => entityListId(e)!));
+  for (const e of entries) {
+    if (e.op !== 'list_delete') continue;
+    const id = entityListId(e);
+    if (!id || !createdIds.has(id)) continue; // synced list — delete must run
+    const createIdx = entries.findIndex((x) => isCreate(x) && entityListId(x) === id);
+    const deleteIdx = entries.indexOf(e);
+    if (createIdx === -1 || deleteIdx < createIdx) continue; // delete precedes create → not a chain
+    for (const x of entries) {
+      if (entityListId(x) === id) drop.add(x.uid);
+    }
+  }
+
+  // Rule C — multiple renames of the same id: last-write-wins, keep only the
+  // final rename (in its original position, so ordering vs later ops holds).
+  const lastRenameUid = new Map<string, string>();
+  for (const e of entries) {
+    if (e.op === 'list_rename' && !drop.has(e.uid)) lastRenameUid.set(entityListId(e)!, e.uid);
+  }
+  for (const e of entries) {
+    if (e.op === 'list_rename' && !drop.has(e.uid) && lastRenameUid.get(entityListId(e)!) !== e.uid) {
+      drop.add(e.uid);
+    }
+  }
+
+  // Rule B — create → rename(s) of an unsynced id (no delete, or A would have
+  // fired): fold the final name into the create payload, drop the rename.
+  const rewrites = new Map<string, WriteQueueEntry>(); // uid → replacement entry
+  for (const e of entries) {
+    if (e.op !== 'list_rename' || drop.has(e.uid)) continue;
+    const id = entityListId(e)!;
+    const create = entries.find(
+      (x) => isCreate(x) && entityListId(x) === id && !drop.has(x.uid)
+    );
+    if (!create) continue;
+    const name = (e.payload as { name: string }).name;
+    const cp = create.payload as Record<string, unknown>;
+    rewrites.set(create.uid, {
+      ...create,
+      payload:
+        create.op === 'default_trip_create'
+          ? { ...cp, title: name }
+          : { ...cp, name },
+    });
+    drop.add(e.uid);
+  }
+
+  // Rule D — add → (later) remove of the same (list_id, place_id) while the
+  // add is still unsynced: both cancel. Alternations pair off nearest-first,
+  // so add,remove,add leaves the final add.
+  const pairKey = (e: WriteQueueEntry) => {
+    const p = e.payload as { list_id?: string; place_id?: string };
+    return `${p.list_id}:${p.place_id}`;
+  };
+  const openAdds = new Map<string, string[]>(); // pair → stack of add uids
+  for (const e of entries) {
+    if (drop.has(e.uid)) continue;
+    if (e.op === 'place_add') {
+      const k = pairKey(e);
+      openAdds.set(k, [...(openAdds.get(k) ?? []), e.uid]);
+    } else if (e.op === 'place_remove') {
+      const k = pairKey(e);
+      const stack = openAdds.get(k) ?? [];
+      const addUid = stack.pop();
+      if (addUid) {
+        drop.add(addUid);
+        drop.add(e.uid);
+        openAdds.set(k, stack);
+      }
+    }
+  }
+
+  return entries
+    .filter((e) => !drop.has(e.uid))
+    .map((e) => rewrites.get(e.uid) ?? e);
 }
 
 let unsubscribe: (() => void) | null = null;

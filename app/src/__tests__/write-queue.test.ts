@@ -97,21 +97,18 @@ describe('write-queue — offline create survives kill, applies exactly once', (
   });
 });
 
-describe('write-queue — FIFO replay of create→rename→delete (no coalescing)', () => {
-  it('replays all three ops in order, no orphan', async () => {
+describe('write-queue — create→rename→delete of an unsynced list coalesces away (M2 Wk2)', () => {
+  it('sends ZERO ops to the server — the whole chain is dead work', async () => {
     const calls: string[] = [];
-    const reg = () => {
-      registerWriteHandler('list_create', async (p: { id: string }) => {
-        calls.push(`create:${p.id}`);
-      });
-      registerWriteHandler('list_rename', async (p: { id: string; name: string }) => {
-        calls.push(`rename:${p.id}:${p.name}`);
-      });
-      registerWriteHandler('list_delete', async (p: { id: string }) => {
-        calls.push(`delete:${p.id}`);
-      });
-    };
-    reg();
+    registerWriteHandler('list_create', async (p: { id: string }) => {
+      calls.push(`create:${p.id}`);
+    });
+    registerWriteHandler('list_rename', async (p: { id: string; name: string }) => {
+      calls.push(`rename:${p.id}:${p.name}`);
+    });
+    registerWriteHandler('list_delete', async (p: { id: string }) => {
+      calls.push(`delete:${p.id}`);
+    });
 
     onlineManager.setOnline(false);
     await enqueue('list_create', 'L', { id: 'L', name: 'A' });
@@ -121,8 +118,29 @@ describe('write-queue — FIFO replay of create→rename→delete (no coalescing
     onlineManager.setOnline(true);
     await drainWriteQueue();
 
-    // All three replay in FIFO order — create before delete, so no orphan.
-    expect(calls).toEqual(['create:L', 'rename:L:B', 'delete:L']);
+    // M1 replayed all three; the Wk2 drain-time coalescer collapses the chain
+    // for a list the server never saw. Nothing hits the network.
+    expect(calls).toEqual([]);
+    expect(await getQueueSnapshot()).toHaveLength(0);
+  });
+
+  it('still replays rename→delete in order for a SYNCED list (no create queued)', async () => {
+    const calls: string[] = [];
+    registerWriteHandler('list_rename', async (p: { id: string; name: string }) => {
+      calls.push(`rename:${p.id}:${p.name}`);
+    });
+    registerWriteHandler('list_delete', async (p: { id: string }) => {
+      calls.push(`delete:${p.id}`);
+    });
+
+    onlineManager.setOnline(false);
+    await enqueue('list_rename', 'L', { id: 'L', name: 'B' });
+    await enqueue('list_delete', 'L', { id: 'L' });
+
+    onlineManager.setOnline(true);
+    await drainWriteQueue();
+
+    expect(calls).toEqual(['rename:L:B', 'delete:L']);
     expect(await getQueueSnapshot()).toHaveLength(0);
   });
 });
@@ -263,8 +281,8 @@ describe('write-queue — save-to-trip: default create then place add (FIFO)', (
   });
 });
 
-describe('write-queue — place add then remove replays in order (offline)', () => {
-  it('drains place_add before place_remove of the same place, FIFO', async () => {
+describe('write-queue — unsynced add→remove of the same pair coalesces away (M2 Wk2)', () => {
+  it('sends neither op — they cancel before the drain touches the network', async () => {
     const calls: string[] = [];
     registerWriteHandler('place_add', async (p: { place_id: string }) => {
       calls.push(`add:${p.place_id}`);
@@ -274,12 +292,27 @@ describe('write-queue — place add then remove replays in order (offline)', () 
     });
 
     onlineManager.setOnline(false);
-    await enqueue('place_add', 'L:P', { list_id: 'L', place_id: 'P', added_at: 't' });
+    await enqueue('place_add', 'L', { list_id: 'L', place_id: 'P', added_at: 't' });
     await enqueue('place_remove', 'L:P', { list_id: 'L', place_id: 'P' });
 
     onlineManager.setOnline(true);
     await drainWriteQueue();
-    expect(calls).toEqual(['add:P', 'remove:P']);
+    expect(calls).toEqual([]);
+    expect(await getQueueSnapshot()).toHaveLength(0);
+  });
+
+  it('a lone remove (synced membership) still drains', async () => {
+    const calls: string[] = [];
+    registerWriteHandler('place_remove', async (p: { place_id: string }) => {
+      calls.push(`remove:${p.place_id}`);
+    });
+
+    onlineManager.setOnline(false);
+    await enqueue('place_remove', 'L:P', { list_id: 'L', place_id: 'P' });
+
+    onlineManager.setOnline(true);
+    await drainWriteQueue();
+    expect(calls).toEqual(['remove:P']);
     expect(await getQueueSnapshot()).toHaveLength(0);
   });
 });
