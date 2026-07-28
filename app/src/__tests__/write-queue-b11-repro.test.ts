@@ -153,6 +153,39 @@ describe('B11 repro — offline sheet toggles + create survive kill and all land
     expect(await getQueueSnapshot()).toHaveLength(0);
   });
 
+  it('a failed beforeDrain gate schedules a retry drain that lands the queue (M2 Wk3 close)', async () => {
+    // The on-device miss: the reconnect drain fires while the session/radio is
+    // still settling → beforeDrain throws → pre-fix the queue silently waited
+    // for the next cold start. Now one bounded retry drains it.
+    jest.useFakeTimers();
+    try {
+      const calls: string[] = [];
+      let sessionReady = false;
+      setBeforeDrain(async () => {
+        if (!sessionReady) throw new Error('no auth session yet');
+      });
+      registerWriteHandler('list_create', async (p: { id: string }) => {
+        calls.push(`create:${p.id}`);
+      });
+
+      onlineManager.setOnline(false);
+      await enqueue('list_create', 'C', { id: 'C', user_id: 'u1', name: 'C', is_default: false });
+
+      onlineManager.setOnline(true);
+      await drainWriteQueue(); // gate fails → retry scheduled
+      expect(calls).toEqual([]);
+      expect(await getQueueSnapshot()).toHaveLength(1); // nothing dropped
+
+      sessionReady = true; // session restored during the wait
+      await jest.advanceTimersByTimeAsync(10_000);
+
+      expect(calls).toEqual(['create:C']);
+      expect(await getQueueSnapshot()).toHaveLength(0);
+    } finally {
+      jest.useRealTimers();
+    }
+  });
+
   it('an RLS/FK error still never drops an entry while OFFLINE-transient conditions hold', async () => {
     // Guard the guard: transient (offline mid-drain) failures must keep
     // taking priority over the permanent-data-error classification.

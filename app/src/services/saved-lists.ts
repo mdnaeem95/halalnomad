@@ -130,6 +130,22 @@ export async function fetchListPlaces(listId: string): Promise<ListPlace[]> {
     .map((r) => ({ ...(r.places as unknown as Place), position: r.position as number }));
 }
 
+/** Set a place's `position` within a trip (M2 Wk3 reorder). Idempotent by
+ *  construction (absolute value, keyed by the join PK); updating a row that
+ *  no longer exists is a no-op. RLS scopes to the owner. */
+export async function updatePlacePosition(
+  listId: string,
+  placeId: string,
+  position: number
+): Promise<void> {
+  const { error } = await supabase
+    .from('saved_list_places')
+    .update({ position })
+    .eq('list_id', listId)
+    .eq('place_id', placeId);
+  if (error) throw error;
+}
+
 /** Remove a place from a trip. Idempotent — deleting an already-removed
  *  (list_id, place_id) row is a no-op, so a queue replay never errors. */
 export async function removePlaceFromList(listId: string, placeId: string): Promise<void> {
@@ -171,8 +187,16 @@ export function registerSavedListWriteHandlers(): void {
   // Before any drain, resolve the session — online + expired, getSession()
   // refreshes the token, so writes (esp. RLS-filtered deletes) never run
   // unauthed and silently no-op. Prevents an offline remove from resurrecting.
+  //
+  // HARD REQUIREMENT (M2 Wk3): getSession() can RESOLVE with no session (e.g.
+  // restore not finished after an offline cold start, or refresh rejected).
+  // Proceeding unauthed makes every queued write an RLS failure — which the
+  // permanent-data-error drop then discards, silently erasing the user's
+  // offline work. No session = throw = drain deferred and retried, never run.
   setBeforeDrain(async () => {
-    await supabase.auth.getSession();
+    const { data, error } = await supabase.auth.getSession();
+    if (error) throw error;
+    if (!data.session) throw new Error('write-queue: no auth session yet; deferring drain');
   });
   registerWriteHandler(
     'list_create',
@@ -192,6 +216,11 @@ export function registerSavedListWriteHandlers(): void {
   );
   registerWriteHandler('place_remove', (p: { list_id: string; place_id: string }) =>
     removePlaceFromList(p.list_id, p.place_id)
+  );
+  registerWriteHandler(
+    'place_reposition',
+    (p: { list_id: string; place_id: string; position: number }) =>
+      updatePlacePosition(p.list_id, p.place_id, p.position)
   );
 
   // After the queue fully drains, reconcile both caches with post-commit server

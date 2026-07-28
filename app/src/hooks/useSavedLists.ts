@@ -9,6 +9,13 @@
  *
  * Events fire on enqueue success ("durably accepted"), not on server ack —
  * offline the ack may never arrive this session, and PostHog queues offline too.
+ *
+ * EVERY mutation here sets networkMode: 'always'. React Query's default
+ * ('online') pauses mutationFn while offline — the optimistic onMutate runs,
+ * but the enqueue never executes, and an app-kill silently loses the write
+ * before it ever reaches the durable queue (found at the M2 close, 2026-07-28;
+ * also the origin of the Wk-1 "ghost trip" rows). Enqueue-only mutationFns
+ * must run unconditionally.
  */
 
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
@@ -98,6 +105,11 @@ export function useRemovePlace() {
   const { user } = useAuth();
 
   return useMutation({
+    // The mutationFn only ENQUEUES into the durable local queue — it must run
+    // even offline. Default networkMode pauses mutationFn while offline, so an
+    // offline write never reached the queue and died with an app-kill (the
+    // M2-close data-loss root cause). 'always' restores the designed contract.
+    networkMode: 'always',
     mutationFn: async (vars: { listId: string; placeId: string }) => {
       await enqueue('place_remove', `${vars.listId}:${vars.placeId}`, {
         list_id: vars.listId,
@@ -146,6 +158,82 @@ export function useRemovePlace() {
   });
 }
 
+// --- Reorder within a trip (M2 Wk3) ----------------------------------------
+
+type ReorderVars = {
+  listId: string;
+  placeId: string;
+  /** Absolute new `position` value for the moved place (midpoint of its new
+   *  neighbours in the 1000-step space). */
+  position: number;
+  /** 0-based indices for the analytics event. */
+  fromIndex: number;
+  toIndex: number;
+  /** When the midpoint space is exhausted (adjacent positions differ by <2),
+   *  the WHOLE list is re-spaced client-side to (i+1)*1000 and every row's new
+   *  position is written through the queue. The coalescer collapses repeated
+   *  moves to one op per (list, place), so this stays cheap. */
+  respace?: { placeId: string; position: number }[];
+};
+
+export function useReorderPlace() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    // The mutationFn only ENQUEUES into the durable local queue — it must run
+    // even offline. Default networkMode pauses mutationFn while offline, so an
+    // offline write never reached the queue and died with an app-kill (the
+    // M2-close data-loss root cause). 'always' restores the designed contract.
+    networkMode: 'always',
+    mutationFn: async ({ listId, placeId, position, respace }: ReorderVars) => {
+      if (respace) {
+        for (const r of respace) {
+          await enqueue('place_reposition', `${listId}:${r.placeId}`, {
+            list_id: listId,
+            place_id: r.placeId,
+            position: r.position,
+          });
+        }
+      } else {
+        await enqueue('place_reposition', `${listId}:${placeId}`, {
+          list_id: listId,
+          place_id: placeId,
+          position,
+        });
+      }
+      void drainWriteQueue();
+    },
+    onMutate: async ({ listId, placeId, position, respace }) => {
+      const listKey = savedPlaceKeys.listPlaces(listId);
+      await queryClient.cancelQueries({ queryKey: listKey });
+      const prev = queryClient.getQueryData<ListPlace[]>(listKey);
+      queryClient.setQueryData<ListPlace[]>(listKey, (old = []) => {
+        const withPositions = respace
+          ? old.map((p) => {
+              const r = respace.find((x) => x.placeId === p.id);
+              return r ? { ...p, position: r.position } : p;
+            })
+          : old.map((p) => (p.id === placeId ? { ...p, position } : p));
+        return [...withPositions].sort((a, b) => a.position - b.position);
+      });
+      return { prev, listKey };
+    },
+    onError: (err, _vars, ctx) => {
+      if (ctx?.prev && ctx?.listKey) queryClient.setQueryData(ctx.listKey, ctx.prev);
+      captureError(err as Error, { mutation: 'reorderPlace' });
+    },
+    onSuccess: (_data, { listId, placeId, fromIndex, toIndex }) => {
+      track(EVENTS.TRIP_LIST_PLACE_REORDERED, {
+        list_id: listId,
+        place_id: placeId,
+        from_position: fromIndex,
+        to_position: toIndex,
+      });
+    },
+    // Reconciliation fires post-commit from the write-queue onQueueIdle.
+  });
+}
+
 type CreateSource = 'first_save' | 'manual';
 
 export function useCreateList() {
@@ -153,6 +241,7 @@ export function useCreateList() {
   const { user } = useAuth();
 
   const mutation = useMutation({
+    networkMode: 'always', // enqueue-only mutationFn must run offline (see useRemovePlace)
     mutationFn: async (vars: { row: SavedList; source: CreateSource }) => {
       await enqueue('list_create', vars.row.id, {
         id: vars.row.id,
@@ -247,6 +336,11 @@ export function useRenameList() {
   const { user } = useAuth();
 
   return useMutation({
+    // The mutationFn only ENQUEUES into the durable local queue — it must run
+    // even offline. Default networkMode pauses mutationFn while offline, so an
+    // offline write never reached the queue and died with an app-kill (the
+    // M2-close data-loss root cause). 'always' restores the designed contract.
+    networkMode: 'always',
     mutationFn: async (vars: { id: string; name: string }) => {
       await enqueue('list_rename', vars.id, { id: vars.id, name: vars.name.trim() });
       void drainWriteQueue();
@@ -282,6 +376,7 @@ export function useDeleteList() {
   const { user } = useAuth();
 
   return useMutation({
+    networkMode: 'always', // enqueue-only mutationFn must run offline (see useRemovePlace)
     // placeCount is 0 in Wk1 (no places-in-list until Wk2's join-table work);
     // threaded now so Wk2 can supply the real count without touching the event.
     mutationFn: async (vars: { id: string; placeCount?: number }) => {
@@ -340,6 +435,7 @@ export function useSaveToTrip() {
   const lists = listsQuery.data;
 
   const mutation = useMutation({
+    networkMode: 'always', // enqueue-only mutationFn must run offline (see useRemovePlace)
     mutationFn: async ({ placeId, listId, isFirst, title }: SaveVars) => {
       // FIFO: the default-trip create must be enqueued BEFORE the place-add that
       // references its list_id, so the queue commits them in that order.

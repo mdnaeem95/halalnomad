@@ -19,6 +19,7 @@
  * Drains on launch (initWriteQueue) and whenever onlineManager flips online.
  */
 
+import { AppState } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { onlineManager } from '@tanstack/react-query';
 import { captureError } from './sentry';
@@ -29,7 +30,8 @@ export type WriteOp =
   | 'list_delete'
   | 'default_trip_create'
   | 'place_add'
-  | 'place_remove';
+  | 'place_remove'
+  | 'place_reposition';
 
 export interface WriteQueueEntry {
   uid: string; // unique per queue entry — the ack-and-remove key
@@ -188,11 +190,16 @@ export async function drainWriteQueue(): Promise<void> {
   try {
     // Ensure a valid auth session before any write (see setBeforeDrain). Bail
     // the whole drain if it fails — better to retry than run writes unauthed.
+    // A failed gate schedules ONE bounded retry: the classic miss is the
+    // reconnect drain firing while DNS/radio (or session restore) is still
+    // settling — without a retry, the queue silently waits for the next cold
+    // start (observed on-device, M2 Wk3 close).
     if (beforeDrain) {
       try {
         await beforeDrain();
       } catch (e) {
         captureError(e as Error, { area: 'write-queue.beforeDrain' });
+        scheduleDrainRetry();
         return;
       }
     }
@@ -200,8 +207,14 @@ export async function drainWriteQueue(): Promise<void> {
     // folds, add→remove cancels) before touching the network. Safe here: the
     // `draining` guard means nothing is in-flight, and acked ops are already
     // gone from the queue. Ops enqueued mid-drain coalesce on the next drain.
-    queue = coalesceQueue(queue);
-    await persist();
+    // Fail-open: a coalescer bug must degrade to an uncoalesced drain, never
+    // stall the queue (an uncaught throw here would reject every drain forever).
+    try {
+      queue = coalesceQueue(queue);
+      await persist();
+    } catch (e) {
+      captureError(e as Error, { area: 'write-queue.coalesce' });
+    }
     // Re-check the head each iteration so items enqueued mid-drain are picked
     // up at the tail and overall ordering is preserved.
     while (queue.length > 0 && onlineManager.isOnline()) {
@@ -296,6 +309,7 @@ function entityListId(e: WriteQueueEntry): string | null {
     case 'default_trip_create':
     case 'place_add':
     case 'place_remove':
+    case 'place_reposition':
       return (p?.list_id as string) ?? null;
     default:
       return null;
@@ -357,6 +371,23 @@ export function coalesceQueue(entries: WriteQueueEntry[]): WriteQueueEntry[] {
     drop.add(e.uid);
   }
 
+  // Rule E — multiple repositions of the same (list_id, place_id): the
+  // position value is absolute, so only the last one matters (kept in its
+  // original slot, like renames). A surviving reposition whose membership
+  // pair nets out to "removed" via Rule D is harmless: the UPDATE matches
+  // zero rows server-side (idempotent no-op), so no extra rule is needed.
+  const lastRepositionUid = new Map<string, string>();
+  for (const e of entries) {
+    if (e.op !== 'place_reposition' || drop.has(e.uid)) continue;
+    const p = e.payload as { list_id: string; place_id: string };
+    lastRepositionUid.set(`${p.list_id}:${p.place_id}`, e.uid);
+  }
+  for (const e of entries) {
+    if (e.op !== 'place_reposition' || drop.has(e.uid)) continue;
+    const p = e.payload as { list_id: string; place_id: string };
+    if (lastRepositionUid.get(`${p.list_id}:${p.place_id}`) !== e.uid) drop.add(e.uid);
+  }
+
   // Rule D — add → (later) remove of the same (list_id, place_id) while the
   // add is still unsynced: both cancel. Alternations pair off nearest-first,
   // so add,remove,add leaves the final add.
@@ -389,12 +420,31 @@ export function coalesceQueue(entries: WriteQueueEntry[]): WriteQueueEntry[] {
 
 let unsubscribe: (() => void) | null = null;
 
-/** Wire drain-on-launch + drain-on-reconnect. Idempotent. */
+// One bounded retry after a failed beforeDrain gate (session not ready /
+// network still settling at the reconnect moment). Single-flight: a pending
+// retry is never stacked.
+const DRAIN_RETRY_MS = 10_000;
+let retryTimer: ReturnType<typeof setTimeout> | null = null;
+
+function scheduleDrainRetry(): void {
+  if (retryTimer) return;
+  retryTimer = setTimeout(() => {
+    retryTimer = null;
+    void drainWriteQueue();
+  }, DRAIN_RETRY_MS);
+}
+
+/** Wire drain-on-launch + drain-on-reconnect + drain-on-foreground. Idempotent. */
 export function initWriteQueue(): void {
   void drainWriteQueue();
   if (!unsubscribe) {
     unsubscribe = onlineManager.subscribe((online: boolean) => {
       if (online) void drainWriteQueue();
+    });
+    // Foregrounding is a natural "conditions changed" signal (radio up,
+    // session restored) — cheap no-op when the queue is empty.
+    AppState.addEventListener('change', (state) => {
+      if (state === 'active') void drainWriteQueue();
     });
   }
 }
@@ -408,4 +458,8 @@ export function __resetWriteQueueForTests(): void {
   for (const k of Object.keys(handlers) as WriteOp[]) delete handlers[k];
   idleListeners.clear();
   beforeDrain = null;
+  if (retryTimer) {
+    clearTimeout(retryTimer);
+    retryTimer = null;
+  }
 }
