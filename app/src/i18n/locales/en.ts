@@ -196,6 +196,16 @@ export default {
     savedToTrips_one: 'Saved to 1 trip',
     savedToTrips_other: 'Saved to {{count}} trips',
     a11yOpensSheet: 'Opens the trip picker',
+    // Reorder + scoped search (M2 Wk3)
+    reorder: 'Reorder',
+    a11yMoveUp: 'Move {{name}} up',
+    a11yMoveDown: 'Move {{name}} down',
+    a11yMovedAnnounce: 'Moved {{name}} to position {{pos}} of {{count}}',
+    searchInTrip: 'Search in {{name}}',
+    searchScopeChip: 'In {{name}}',
+    a11yScopeChip: 'Searching in {{name}}',
+    a11yScopeClearHint: 'Clears the trip filter and searches all places',
+    a11yScopeCleared: 'Trip filter cleared. Searching all places.',
   },
 
   // Display-time Google photos layer (zero-photo places)

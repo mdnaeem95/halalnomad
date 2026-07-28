@@ -8,9 +8,14 @@ import {
   TextInput,
   View,
 } from 'react-native';
+import { AccessibilityInfo } from 'react-native';
+import * as Haptics from 'expo-haptics';
 import { FlashList } from '@shopify/flash-list';
-import { router } from 'expo-router';
+import { Ionicons } from '@expo/vector-icons';
+import { router, useLocalSearchParams } from 'expo-router';
+import { useTranslation } from 'react-i18next';
 import { useSearchPlaces } from '../../src/hooks/usePlaces';
+import { useListPlaces } from '../../src/hooks/useSavedLists';
 import { usePremium } from '../../src/hooks/usePremium';
 import { useTheme } from '../../src/hooks/useTheme';
 import { useAppStore } from '../../src/stores/app-store';
@@ -43,6 +48,7 @@ function useDebounce<T>(value: T, delay: number): T {
 }
 
 export default function SearchScreen() {
+  const { t } = useTranslation();
   const { colors: c } = useTheme();
   const styles = React.useMemo(() => createStyles(c), [c]);
   const { isPremium } = usePremium();
@@ -51,15 +57,54 @@ export default function SearchScreen() {
   const cuisineFilter = useAppStore((s) => s.searchFilters.cuisineType);
   const setSearchFilters = useAppStore((s) => s.setSearchFilters);
 
+  // Trip scope (M2 Wk3): arriving via a trip's search affordance pre-scopes
+  // search to that trip via a clearable chip. Scoped search never hits the
+  // server — it filters the trip's own (persisted) place cache, so it works
+  // offline over cached places. Clearing the chip returns to catalog search.
+  const params = useLocalSearchParams<{ listId?: string; listName?: string }>();
+  const [scope, setScope] = useState<{ listId: string; listName: string } | null>(null);
+  useEffect(() => {
+    if (params.listId) {
+      setScope({ listId: params.listId, listName: params.listName ?? '' });
+    }
+  }, [params.listId, params.listName]);
+
+  function clearScope() {
+    Haptics.selectionAsync();
+    setScope(null);
+    // Drop the stale params so re-focusing the tab doesn't resurrect the chip.
+    router.setParams({ listId: undefined, listName: undefined });
+    AccessibilityInfo.announceForAccessibility(t('trips.a11yScopeCleared'));
+  }
+
   const debouncedQuery = useDebounce(searchQuery, 300);
   const hasInput = debouncedQuery.length > 0 || !!cuisineFilter;
 
   const {
-    data: results = [],
-    isLoading,
+    data: catalogResults = [],
+    isLoading: catalogLoading,
     refetch,
     isRefetching,
-  } = useSearchPlaces(debouncedQuery, cuisineFilter);
+  } = useSearchPlaces(scope ? '' : debouncedQuery, scope ? null : cuisineFilter);
+  const { data: tripPlaces = [] } = useListPlaces(scope?.listId);
+
+  // Scoped mode filters the trip's cached places client-side (name in either
+  // script + the cuisine chips still apply). Empty query = browse the trip.
+  const scopedResults = React.useMemo(() => {
+    if (!scope) return [];
+    const q = debouncedQuery.trim().toLowerCase();
+    return tripPlaces.filter((p) => {
+      if (cuisineFilter && p.cuisine_type !== cuisineFilter) return false;
+      if (!q) return true;
+      return (
+        p.name_en.toLowerCase().includes(q) ||
+        (p.name_local ?? '').toLowerCase().includes(q)
+      );
+    });
+  }, [scope, tripPlaces, debouncedQuery, cuisineFilter]);
+
+  const results = scope ? scopedResults : catalogResults;
+  const isLoading = scope ? false : catalogLoading;
 
   // search_performed: fire once per resolved (query, cuisine) once the query
   // settles. cuisine_filter_count is 0|1 — the cuisine filter is single-select
@@ -68,7 +113,7 @@ export default function SearchScreen() {
   const lastSearchKey = useRef<string | null>(null);
   useEffect(() => {
     if (!hasInput || isLoading) return;
-    const key = `${debouncedQuery}|${cuisineFilter ?? ''}`;
+    const key = `${debouncedQuery}|${cuisineFilter ?? ''}|${scope?.listId ?? ''}`;
     if (lastSearchKey.current === key) return;
     lastSearchKey.current = key;
     track(EVENTS.SEARCH_PERFORMED, {
@@ -76,8 +121,11 @@ export default function SearchScreen() {
       cuisine_filter_count: cuisineFilter ? 1 : 0,
       result_count: results.length,
       is_no_results: results.length === 0,
+      // M2 Wk3: no new event name — scope discriminates trip-scoped searches.
+      scope: scope ? 'trip' : 'catalog',
+      ...(scope ? { list_id: scope.listId } : {}),
     });
-  }, [debouncedQuery, cuisineFilter, isLoading, results, hasInput]);
+  }, [debouncedQuery, cuisineFilter, isLoading, results, hasInput, scope]);
 
   function handlePlacePress(place: Place) {
     router.push(placeHref(place.id, 'search'));
@@ -117,6 +165,24 @@ export default function SearchScreen() {
           </Pressable>
         )}
       </View>
+
+      {/* Trip scope chip (M2 Wk3) */}
+      {scope && (
+        <View style={styles.scopeRow}>
+          <Pressable
+            style={styles.scopeChip}
+            onPress={clearScope}
+            accessibilityRole="button"
+            accessibilityLabel={t('trips.a11yScopeChip', { name: scope.listName })}
+            accessibilityHint={t('trips.a11yScopeClearHint')}
+          >
+            <Text style={styles.scopeChipText} numberOfLines={1}>
+              {t('trips.searchScopeChip', { name: scope.listName })}
+            </Text>
+            <Ionicons name="close-circle" size={18} color={c.textOnPrimary} />
+          </Pressable>
+        </View>
+      )}
 
       {/* Cuisine filters */}
       <ScrollView
@@ -223,6 +289,28 @@ const createStyles = (c: AppColors) => StyleSheet.create({
   clearText: {
     ...typography.label,
     color: c.textTertiary,
+  },
+  scopeRow: {
+    paddingHorizontal: spacing.sm,
+    paddingBottom: spacing.sm,
+    flexDirection: 'row',
+  },
+  // ≥44pt target.
+  scopeChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    backgroundColor: c.primary,
+    borderRadius: 22,
+    paddingHorizontal: 14,
+    minHeight: 44,
+    maxWidth: '80%',
+  },
+  scopeChipText: {
+    ...typography.caption,
+    color: c.textOnPrimary,
+    fontWeight: '700',
+    flexShrink: 1,
   },
   chipScroll: {
     flexGrow: 0,

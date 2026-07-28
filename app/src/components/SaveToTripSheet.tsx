@@ -134,7 +134,7 @@ export function SaveToTripSheet({ visible, place, onClose }: Props) {
             </Pressable>
           </View>
 
-          <ScrollView style={styles.rows} bounces={false}>
+          <ScrollView style={styles.rows} bounces={false} showsVerticalScrollIndicator={false}>
             {sorted.map((list) => {
               const isMember = listIds.includes(list.id);
               return (

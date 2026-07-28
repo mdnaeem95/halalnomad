@@ -288,6 +288,21 @@ Numbered sequentially in `app/src/lib/migration-*.sql`. Current set:
   → uploadPhoto` since v1 but was never created in production — every
   photo-attached submission failed with "Bucket not found" until this
   landed
+- `015` — `ward` column on `places` + `places_staging`
+- `016` — `day_index` column on `saved_lists`
+- `017` — rename `ward` → `neighbourhood` (places + staging)
+- `018` — fix `increment_verification` (SECURITY DEFINER) + backfill
+- `019` — backfill city/country on the early demo-seed places
+- `020` — remove off-scope demo-seed leftovers + one duplicate
+- `021` — profile engagement counters for analytics identity
+- `022` — monthly instrumentation firing-audit (pg_cron)
+- `023` — Trip Planning foundation: `saved_lists` + `saved_list_places`
+  join (RLS, one-default-per-user partial unique index)
+- `024` — Trip Planning RPCs: `set_default_trip` (atomic default swap)
+  + `add_place_to_list` (server-computed 1000-step position)
+- `025` — `add_place_to_list` no-ops on a missing list (B11 ghost-trip
+  hardening; client drop logic stays as defense-in-depth)
+- `026` — **RESERVED** for the M4 share model (per the Wk-3 brief)
 
 **Run them manually in Supabase SQL Editor.** No migration runner yet.
 When adding a new one, keep the number sequence and document the

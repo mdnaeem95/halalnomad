@@ -34,6 +34,12 @@ const add = (listId: string, placeId: string) =>
   entry('place_add', listId, { list_id: listId, place_id: placeId, added_at: 't' });
 const remove = (listId: string, placeId: string) =>
   entry('place_remove', `${listId}:${placeId}`, { list_id: listId, place_id: placeId });
+const reposition = (listId: string, placeId: string, position: number) =>
+  entry('place_reposition', `${listId}:${placeId}`, {
+    list_id: listId,
+    place_id: placeId,
+    position,
+  });
 
 const ops = (q: WriteQueueEntry[]) => q.map((e) => e.op);
 
@@ -136,6 +142,30 @@ describe('coalesceQueue', () => {
       ['place_remove', 'u7'],
     ]);
     expect((out[0].payload as { name: string }).name).toBe('a2');
+  });
+
+  it('collapses repeated repositions of the same pair to the last one (M2 Wk3)', () => {
+    const q = [
+      reposition('L', 'p1', 1500),
+      reposition('L', 'p1', 2500),
+      reposition('L', 'p2', 500),
+      reposition('L', 'p1', 750),
+    ];
+    const out = coalesceQueue(q);
+    expect(out).toHaveLength(2);
+    expect((out[0].payload as { place_id: string; position: number })).toMatchObject({
+      place_id: 'p2',
+      position: 500,
+    });
+    expect((out[1].payload as { place_id: string; position: number })).toMatchObject({
+      place_id: 'p1',
+      position: 750,
+    });
+  });
+
+  it('drops repositions into a created-then-deleted unsynced list (chain rule)', () => {
+    const q = [create('A'), add('A', 'p1'), reposition('A', 'p1', 500), del('A')];
+    expect(coalesceQueue(q)).toEqual([]);
   });
 
   it('leaves an untouched queue byte-identical (no accidental rewrites)', () => {

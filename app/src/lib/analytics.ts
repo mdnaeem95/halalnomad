@@ -104,6 +104,8 @@ export const EVENTS = {
   TRIP_LIST_OPENED: 'trip_list_opened',
   PLACE_SAVED_TO_LIST: 'place_saved_to_list',
   PLACE_REMOVED_FROM_LIST: 'place_removed_from_list',
+  // Trip Planning (M2 Wk3) — from_position/to_position are 0-based row indices
+  TRIP_LIST_PLACE_REORDERED: 'trip_list_place_reordered',
 
   // Engagement
   LANGUAGE_CHANGED: 'language_changed',

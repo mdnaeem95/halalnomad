@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { AccessibilityInfo, ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
+import { AccessibilityInfo, ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { FlashList } from '@shopify/flash-list';
+import * as Haptics from 'expo-haptics';
 import { Swipeable } from 'react-native-gesture-handler';
 import { Ionicons } from '@expo/vector-icons';
 import { Stack, router, useLocalSearchParams } from 'expo-router';
@@ -10,7 +11,12 @@ import { useTheme } from '../../src/hooks/useTheme';
 import { AppColors } from '../../src/constants/theme';
 import { useLocation } from '../../src/hooks/useLocation';
 import { placeKeys } from '../../src/hooks/usePlaces';
-import { useSavedLists, useListPlaces, useRemovePlace } from '../../src/hooks/useSavedLists';
+import {
+  useSavedLists,
+  useListPlaces,
+  useRemovePlace,
+  useReorderPlace,
+} from '../../src/hooks/useSavedLists';
 import { PlaceCard } from '../../src/components/PlaceCard';
 import { Toast } from '../../src/components/AppDialog';
 import { placeHref } from '../../src/lib/navigation';
@@ -30,6 +36,16 @@ export default function TripDetailScreen() {
   const list = (lists ?? []).find((l) => l.id === id);
   const { data: places, isLoading } = useListPlaces(id);
   const removePlace = useRemovePlace();
+  const reorderPlace = useReorderPlace();
+
+  // Reorder edit mode (M2 Wk3). Time-box call, documented in the Wk3 report:
+  // free drag on the current gesture stack (FlashList + Swipeable, Animated
+  // only, variable-height cards) is the "drag fights the stack" case the
+  // brief anticipated — shipped the sanctioned fallback instead: an explicit
+  // edit mode with 44pt move up/down controls (better VoiceOver semantics
+  // than drag, zero conflict with swipe-to-remove, which is disabled while
+  // editing). Drag elegance lands in M3 alongside the day-grouping drag work.
+  const [editMode, setEditMode] = useState(false);
 
   // Seed each place into the place-detail cache so tapping a place opens offline
   // (place/[id] reads ['places','detail',id], a different key from the join
@@ -75,6 +91,54 @@ export default function TripDetailScreen() {
     );
   }
 
+  /** Move a place one slot up/down. New position = midpoint of its new
+   *  neighbours in the 1000-step space; when the gap is exhausted (<2 apart),
+   *  re-space the whole list to (i+1)*1000 through the queue. */
+  function movePlace(index: number, dir: -1 | 1) {
+    if (!id || !places) return;
+    const target = index + dir;
+    if (target < 0 || target >= places.length) return;
+    const item = places[index];
+
+    const rest = places.filter((_, i) => i !== index);
+    const prevNeighbour = target > 0 ? rest[target - 1] : null;
+    const nextNeighbour = target < rest.length ? rest[target] : null;
+
+    let position: number;
+    if (!prevNeighbour) position = (nextNeighbour?.position ?? 0) - 1000;
+    else if (!nextNeighbour) position = prevNeighbour.position + 1000;
+    else position = Math.floor((prevNeighbour.position + nextNeighbour.position) / 2);
+
+    Haptics.selectionAsync();
+
+    const collided =
+      (prevNeighbour && position <= prevNeighbour.position) ||
+      (nextNeighbour && position >= nextNeighbour.position);
+
+    if (collided) {
+      const newOrder = [...rest.slice(0, target), item, ...rest.slice(target)];
+      reorderPlace.mutate({
+        listId: id,
+        placeId: item.id,
+        position: (target + 1) * 1000,
+        fromIndex: index,
+        toIndex: target,
+        respace: newOrder.map((p, i) => ({ placeId: p.id, position: (i + 1) * 1000 })),
+      });
+    } else {
+      reorderPlace.mutate({
+        listId: id,
+        placeId: item.id,
+        position,
+        fromIndex: index,
+        toIndex: target,
+      });
+    }
+    AccessibilityInfo.announceForAccessibility(
+      t('trips.a11yMovedAnnounce', { name: item.name_en, pos: target + 1, count: places.length })
+    );
+  }
+
   const renderRightActions = (place: ListPlace) => () =>
     (
       <Pressable
@@ -89,9 +153,52 @@ export default function TripDetailScreen() {
       </Pressable>
     );
 
+  // Header: scoped-search entry + reorder toggle (only when there's something
+  // to search/reorder).
+  const headerRight =
+    count > 0
+      ? () => (
+          <View style={styles.headerActions}>
+            {!editMode && (
+              <Pressable
+                onPress={() =>
+                  router.navigate(
+                    `/search?listId=${id}&listName=${encodeURIComponent(tripName)}`
+                  )
+                }
+                hitSlop={10}
+                style={styles.headerAction}
+                accessibilityRole="button"
+                accessibilityLabel={t('trips.searchInTrip', { name: tripName })}
+              >
+                <Ionicons name="search" size={20} color={c.textOnPrimary} />
+              </Pressable>
+            )}
+            <Pressable
+              onPress={() => {
+                Haptics.selectionAsync();
+                setEditMode((v) => !v);
+              }}
+              hitSlop={10}
+              style={styles.headerAction}
+              accessibilityRole="button"
+              accessibilityLabel={editMode ? t('common.done') : t('trips.reorder')}
+            >
+              {editMode ? (
+                <Text style={styles.headerActionText}>{t('common.done')}</Text>
+              ) : (
+                <Ionicons name="swap-vertical" size={20} color={c.textOnPrimary} />
+              )}
+            </Pressable>
+          </View>
+        )
+      : undefined;
+
   return (
     <View style={styles.container}>
-      <Stack.Screen options={{ title: tripName, headerBackButtonDisplayMode: 'minimal' }} />
+      <Stack.Screen
+        options={{ title: tripName, headerBackButtonDisplayMode: 'minimal', headerRight }}
+      />
 
       {isLoading && !places ? (
         <View style={styles.center}>
@@ -106,6 +213,54 @@ export default function TripDetailScreen() {
             <Text style={styles.primaryButtonText}>{t('trips.findPlaces')}</Text>
           </Pressable>
         </View>
+      ) : editMode ? (
+        // Edit mode renders a plain non-virtualized list: FlashList re-measures
+        // on every data mutation, which read as the whole list "jumping" per
+        // move on device. Trip lists are small (soft-capped world), so a
+        // ScrollView with per-place keys keeps rows stable — a move swaps two
+        // children in place and the scroll offset never shifts.
+        <ScrollView contentContainerStyle={styles.listContent}>
+          <View style={styles.subheader}>
+            <Text style={styles.subheaderCount}>
+              {t('trips.placeCount', { count })}
+            </Text>
+            {list?.is_default && (
+              <View style={styles.defaultBadge}>
+                <Text style={styles.defaultBadgeText}>{t('trips.defaultBadge')}</Text>
+              </View>
+            )}
+          </View>
+          {(places ?? []).map((item, index) => (
+            <View key={item.id} style={styles.editRow}>
+              <View style={styles.editCard} pointerEvents="none">
+                {/* Navigation is parked while editing; onPress is a no-op. */}
+                <PlaceCard place={item} onPress={() => {}} distance={distanceFor(item)} />
+              </View>
+              <View style={styles.moveControls}>
+                <Pressable
+                  style={[styles.moveButton, index === 0 && styles.moveButtonDisabled]}
+                  onPress={() => movePlace(index, -1)}
+                  disabled={index === 0}
+                  accessibilityRole="button"
+                  accessibilityLabel={t('trips.a11yMoveUp', { name: item.name_en })}
+                  accessibilityState={{ disabled: index === 0 }}
+                >
+                  <Ionicons name="chevron-up" size={22} color={index === 0 ? c.textTertiary : c.primary} />
+                </Pressable>
+                <Pressable
+                  style={[styles.moveButton, index === count - 1 && styles.moveButtonDisabled]}
+                  onPress={() => movePlace(index, 1)}
+                  disabled={index === count - 1}
+                  accessibilityRole="button"
+                  accessibilityLabel={t('trips.a11yMoveDown', { name: item.name_en })}
+                  accessibilityState={{ disabled: index === count - 1 }}
+                >
+                  <Ionicons name="chevron-down" size={22} color={index === count - 1 ? c.textTertiary : c.primary} />
+                </Pressable>
+              </View>
+            </View>
+          ))}
+        </ScrollView>
       ) : (
         <FlashList
           data={places ?? []}
@@ -188,4 +343,22 @@ const createStyles = (c: AppColors) =>
       gap: 2,
     },
     removeActionText: { color: c.textOnPrimary, fontSize: 12, fontWeight: '700' },
+    headerActions: { flexDirection: 'row', alignItems: 'center', gap: 4 },
+    // ≥44pt targets (12 pad + 20 icon).
+    headerAction: { padding: 12 },
+    headerActionText: { color: c.textOnPrimary, fontSize: 15, fontWeight: '700' },
+    editRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+    editCard: { flex: 1 },
+    moveControls: { justifyContent: 'center', gap: 4, marginBottom: 12 },
+    moveButton: {
+      width: 44,
+      height: 44,
+      borderRadius: 10,
+      alignItems: 'center',
+      justifyContent: 'center',
+      backgroundColor: c.surface,
+      borderWidth: 1,
+      borderColor: c.border,
+    },
+    moveButtonDisabled: { opacity: 0.4 },
   });
