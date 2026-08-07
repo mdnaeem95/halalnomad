@@ -351,37 +351,39 @@ export default function TripDetailScreen() {
                 overshootRight={false}
                 rightThreshold={40}
               >
-                <View>
-                  <PlaceCard
-                    place={row.item}
-                    onPress={(p) => router.push(placeHref(p.id, 'trip_detail'))}
-                    distance={distanceFor(row.item)}
-                  />
-                  {/* Day chip — the tap-to-assign affordance (M3 v1). */}
-                  <Pressable
-                    style={[styles.dayChip, row.item.day_index == null && styles.dayChipEmpty]}
-                    onPress={() => setDayPickerFor(row.item)}
-                    hitSlop={8}
-                    accessibilityRole="button"
-                    accessibilityLabel={t('trips.a11yDayChip', { name: row.item.name_en })}
-                  >
-                    <Ionicons
-                      name="calendar-outline"
-                      size={13}
-                      color={row.item.day_index == null ? c.textSecondary : c.textOnPrimary}
-                    />
-                    <Text
-                      style={[
-                        styles.dayChipText,
-                        row.item.day_index == null && { color: c.textSecondary },
-                      ]}
+                <PlaceCard
+                  place={row.item}
+                  onPress={(p) => router.push(placeHref(p.id, 'trip_detail'))}
+                  distance={distanceFor(row.item)}
+                  headerAccessory={
+                    /* Day chip — tap-to-assign (M3 v1). In-layout via the
+                       accessory slot, so long names truncate against it and
+                       it never covers the halal badge. */
+                    <Pressable
+                      style={[styles.dayChip, row.item.day_index == null && styles.dayChipEmpty]}
+                      onPress={() => setDayPickerFor(row.item)}
+                      hitSlop={8}
+                      accessibilityRole="button"
+                      accessibilityLabel={t('trips.a11yDayChip', { name: row.item.name_en })}
                     >
-                      {row.item.day_index == null
-                        ? t('trips.dayChipUnassigned')
-                        : t('trips.day', { n: row.item.day_index })}
-                    </Text>
-                  </Pressable>
-                </View>
+                      <Ionicons
+                        name="calendar-outline"
+                        size={13}
+                        color={row.item.day_index == null ? c.textSecondary : c.textOnPrimary}
+                      />
+                      <Text
+                        style={[
+                          styles.dayChipText,
+                          row.item.day_index == null && { color: c.textSecondary },
+                        ]}
+                      >
+                        {row.item.day_index == null
+                          ? t('trips.dayChipUnassigned')
+                          : t('trips.day', { n: row.item.day_index })}
+                      </Text>
+                    </Pressable>
+                  }
+                />
               </Swipeable>
             )
           }
@@ -472,14 +474,9 @@ const createStyles = (c: AppColors) =>
     },
     daySectionTitle: { fontSize: 17, fontWeight: '700', color: c.textPrimary },
     daySectionCount: { fontSize: 13, color: c.textTertiary },
-    // ≥44pt effective target (28 high + hitSlop 8). Sits above the card's
-    // top-right corner, clear of the card's own tap navigation. The chip is
-    // positioned relative to the row wrapper while PlaceCard insets itself
-    // 16 (marginHorizontal) — anchor inside the card edge: 16 + 8.
+    // ≥44pt effective target (28 high + hitSlop 8). Lives in PlaceCard's
+    // header row via the accessory slot — flex layout, never overlaps.
     dayChip: {
-      position: 'absolute',
-      top: 8,
-      end: 24,
       flexDirection: 'row',
       alignItems: 'center',
       gap: 4,

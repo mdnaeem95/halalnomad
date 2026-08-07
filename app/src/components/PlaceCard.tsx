@@ -20,9 +20,15 @@ interface Props {
   place: Place;
   onPress: (place: Place) => void;
   distance?: string;
+  /** Optional element rendered at the end of the header row (after the
+   *  halal badge) — participates in flex layout so the name truncates
+   *  against it instead of being overlapped. Used by trip detail for the
+   *  M3 day chip. Interactive accessories work: a nested Pressable
+   *  captures its own taps without triggering the card's navigation. */
+  headerAccessory?: React.ReactNode;
 }
 
-export function PlaceCard({ place, onPress, distance }: Props) {
+export function PlaceCard({ place, onPress, distance, headerAccessory }: Props) {
   const { colors: c } = useTheme();
   const styles = React.useMemo(() => createStyles(c), [c]);
 
@@ -58,6 +64,7 @@ export function PlaceCard({ place, onPress, distance }: Props) {
             {place.name_en}
           </Text>
           <HalalBadge level={place.halal_level} compact />
+          {headerAccessory}
         </View>
 
         {place.name_local && (
