@@ -121,13 +121,33 @@ export async function fetchSavedPlacePairs(): Promise<SavedPlacePair[]> {
 export async function fetchListPlaces(listId: string): Promise<ListPlace[]> {
   const { data, error } = await supabase
     .from('saved_list_places')
-    .select('position, places(*)')
+    .select('position, day_index, places(*)')
     .eq('list_id', listId)
     .order('position', { ascending: true });
   if (error) throw error;
   return (data ?? [])
     .filter((r) => r.places)
-    .map((r) => ({ ...(r.places as unknown as Place), position: r.position as number }));
+    .map((r) => ({
+      ...(r.places as unknown as Place),
+      position: r.position as number,
+      day_index: (r.day_index as number | null) ?? null,
+    }));
+}
+
+/** Assign/unassign a place's day within a trip (M3 day grouping). Absolute
+ *  value keyed by the join PK — idempotent; a row that no longer exists
+ *  no-ops. NULL = Ungrouped. */
+export async function updatePlaceDayIndex(
+  listId: string,
+  placeId: string,
+  dayIndex: number | null
+): Promise<void> {
+  const { error } = await supabase
+    .from('saved_list_places')
+    .update({ day_index: dayIndex })
+    .eq('list_id', listId)
+    .eq('place_id', placeId);
+  if (error) throw error;
 }
 
 /** Set a place's `position` within a trip (M2 Wk3 reorder). Idempotent by
@@ -221,6 +241,11 @@ export function registerSavedListWriteHandlers(): void {
     'place_reposition',
     (p: { list_id: string; place_id: string; position: number }) =>
       updatePlacePosition(p.list_id, p.place_id, p.position)
+  );
+  registerWriteHandler(
+    'place_day_assign',
+    (p: { list_id: string; place_id: string; day_index: number | null }) =>
+      updatePlaceDayIndex(p.list_id, p.place_id, p.day_index)
   );
 
   // After the queue fully drains, reconcile both caches with post-commit server

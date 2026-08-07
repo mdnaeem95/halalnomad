@@ -270,7 +270,7 @@ export interface SavedListPlace {
 }
 
 // A place as it appears inside a trip — the full place record plus its
-// `position` in the list (for ordering + future drag-reorder).
-export type ListPlace = Place & { position: number };
+// `position` in the list and its day assignment (M3: null = Ungrouped).
+export type ListPlace = Place & { position: number; day_index: number | null };
 
 export type MapProviderType = 'google' | 'amap' | 'apple';

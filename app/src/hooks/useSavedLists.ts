@@ -38,6 +38,9 @@ import { ListPlace, Place, SavedList } from '../types';
 // kept soft so we can relax it without a migration.
 export const LIST_SOFT_CAP = 10;
 
+// M3 day grouping: soft cap on day count, client-side like the list cap.
+export const DAY_SOFT_CAP = 14;
+
 export const savedListKeys = {
   all: ['saved-lists'] as const,
   list: (userId: string) => ['saved-lists', userId] as const,
@@ -228,6 +231,48 @@ export function useReorderPlace() {
         place_id: placeId,
         from_position: fromIndex,
         to_position: toIndex,
+      });
+    },
+    // Reconciliation fires post-commit from the write-queue onQueueIdle.
+  });
+}
+
+// --- Day grouping (M3 Wk1) --------------------------------------------------
+
+/** Assign/unassign a place's day (null = Ungrouped). The seventh queue-backed
+ *  mutation — same optimistic + FIFO + networkMode:'always' contract; repeated
+ *  assigns of the same pair coalesce last-wins at drain. */
+export function useAssignDay() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    networkMode: 'always', // enqueue-only mutationFn must run offline (see useRemovePlace)
+    mutationFn: async (vars: { listId: string; placeId: string; dayIndex: number | null }) => {
+      await enqueue('place_day_assign', `${vars.listId}:${vars.placeId}`, {
+        list_id: vars.listId,
+        place_id: vars.placeId,
+        day_index: vars.dayIndex,
+      });
+      void drainWriteQueue();
+    },
+    onMutate: async ({ listId, placeId, dayIndex }) => {
+      const listKey = savedPlaceKeys.listPlaces(listId);
+      await queryClient.cancelQueries({ queryKey: listKey });
+      const prev = queryClient.getQueryData<ListPlace[]>(listKey);
+      queryClient.setQueryData<ListPlace[]>(listKey, (old = []) =>
+        old.map((p) => (p.id === placeId ? { ...p, day_index: dayIndex } : p))
+      );
+      return { prev, listKey };
+    },
+    onError: (err, _vars, ctx) => {
+      if (ctx?.prev && ctx?.listKey) queryClient.setQueryData(ctx.listKey, ctx.prev);
+      captureError(err as Error, { mutation: 'assignDay' });
+    },
+    onSuccess: (_data, { listId, placeId, dayIndex }) => {
+      track(EVENTS.TRIP_LIST_DAY_ASSIGNED, {
+        list_id: listId,
+        place_id: placeId,
+        day_index: dayIndex,
       });
     },
     // Reconciliation fires post-commit from the write-queue onQueueIdle.
@@ -447,6 +492,23 @@ export function useSaveToTrip() {
         place_id: placeId,
         added_at: new Date().toISOString(),
       });
+      // M3 auto-assign rule: when the trip's EXISTING places (≥1, per the
+      // cached copy) are all on Day 1, the new save joins Day 1 — keeps
+      // single-day trips frictionless. Anything else lands Ungrouped (null),
+      // including the first-ever save (an empty trip must stay a flat list).
+      // Cache-evaluated: if the trip was never opened this session there's no
+      // day data to reason from and we default to Ungrouped. Silent — the
+      // trip_list_day_assigned event is reserved for the user's picker action.
+      const cached = queryClient.getQueryData<ListPlace[]>(
+        savedPlaceKeys.listPlaces(listId)
+      );
+      if (cached && cached.length > 0 && cached.every((p) => p.day_index === 1)) {
+        await enqueue('place_day_assign', `${listId}:${placeId}`, {
+          list_id: listId,
+          place_id: placeId,
+          day_index: 1,
+        });
+      }
       void drainWriteQueue();
     },
     onMutate: async ({ placeId, listId, isFirst, title }) => {

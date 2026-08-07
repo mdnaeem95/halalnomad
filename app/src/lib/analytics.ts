@@ -106,6 +106,8 @@ export const EVENTS = {
   PLACE_REMOVED_FROM_LIST: 'place_removed_from_list',
   // Trip Planning (M2 Wk3) — from_position/to_position are 0-based row indices
   TRIP_LIST_PLACE_REORDERED: 'trip_list_place_reordered',
+  // Trip Planning (M3 Wk1) — day_index null = unassigned back to Ungrouped
+  TRIP_LIST_DAY_ASSIGNED: 'trip_list_day_assigned',
 
   // Engagement
   LANGUAGE_CHANGED: 'language_changed',

@@ -40,6 +40,12 @@ const reposition = (listId: string, placeId: string, position: number) =>
     place_id: placeId,
     position,
   });
+const dayAssign = (listId: string, placeId: string, dayIndex: number | null) =>
+  entry('place_day_assign', `${listId}:${placeId}`, {
+    list_id: listId,
+    place_id: placeId,
+    day_index: dayIndex,
+  });
 
 const ops = (q: WriteQueueEntry[]) => q.map((e) => e.op);
 
@@ -165,6 +171,23 @@ describe('coalesceQueue', () => {
 
   it('drops repositions into a created-then-deleted unsynced list (chain rule)', () => {
     const q = [create('A'), add('A', 'p1'), reposition('A', 'p1', 500), del('A')];
+    expect(coalesceQueue(q)).toEqual([]);
+  });
+
+  it('collapses repeated day-assigns of the same pair to the last one (M3 Wk1)', () => {
+    const q = [dayAssign('L', 'p1', 2), dayAssign('L', 'p1', null), dayAssign('L', 'p1', 3)];
+    const out = coalesceQueue(q);
+    expect(out).toHaveLength(1);
+    expect((out[0].payload as { day_index: number | null }).day_index).toBe(3);
+  });
+
+  it('day-assigns and repositions of the same pair do NOT collapse each other', () => {
+    const q = [reposition('L', 'p1', 500), dayAssign('L', 'p1', 2)];
+    expect(coalesceQueue(q).map((e) => e.op)).toEqual(['place_reposition', 'place_day_assign']);
+  });
+
+  it('drops day-assigns into a created-then-deleted unsynced list (chain rule)', () => {
+    const q = [create('A'), add('A', 'p1'), dayAssign('A', 'p1', 1), del('A')];
     expect(coalesceQueue(q)).toEqual([]);
   });
 

@@ -16,7 +16,9 @@ import {
   useListPlaces,
   useRemovePlace,
   useReorderPlace,
+  useAssignDay,
 } from '../../src/hooks/useSavedLists';
+import { DayPickerSheet } from '../../src/components/DayPickerSheet';
 import { PlaceCard } from '../../src/components/PlaceCard';
 import { Toast } from '../../src/components/AppDialog';
 import { placeHref } from '../../src/lib/navigation';
@@ -46,6 +48,46 @@ export default function TripDetailScreen() {
   // than drag, zero conflict with swipe-to-remove, which is disabled while
   // editing). Drag elegance lands in M3 alongside the day-grouping drag work.
   const [editMode, setEditMode] = useState(false);
+
+  // M3 day grouping (tap-to-assign v1). Sections appear once any place has a
+  // day; Ungrouped renders LAST (days are the itinerary, Ungrouped is the
+  // inbox at the bottom — kept stable per the locked decision). Empty
+  // intermediate days render to preserve the trip's structure. Within a day,
+  // the existing global `position` orders rows.
+  const assignDay = useAssignDay();
+  const [dayPickerFor, setDayPickerFor] = useState<ListPlace | null>(null);
+  const maxDay = Math.max(0, ...(places ?? []).map((p) => p.day_index ?? 0));
+  const anyDays = maxDay > 0;
+
+  type Row =
+    | { type: 'header'; day: number | null; placeCount: number }
+    | { type: 'place'; item: ListPlace };
+  const rows: Row[] = useMemo(() => {
+    const ps = places ?? [];
+    if (!anyDays) return ps.map((item) => ({ type: 'place' as const, item }));
+    const out: Row[] = [];
+    for (let d = 1; d <= maxDay; d += 1) {
+      const inDay = ps.filter((p) => p.day_index === d);
+      out.push({ type: 'header', day: d, placeCount: inDay.length });
+      inDay.forEach((item) => out.push({ type: 'place', item }));
+    }
+    const ungrouped = ps.filter((p) => p.day_index == null);
+    if (ungrouped.length > 0) {
+      out.push({ type: 'header', day: null, placeCount: ungrouped.length });
+      ungrouped.forEach((item) => out.push({ type: 'place', item }));
+    }
+    return out;
+  }, [places, anyDays, maxDay]);
+
+  function handleAssignDay(place: ListPlace, dayIndex: number | null) {
+    if (!id) return;
+    assignDay.mutate({ listId: id, placeId: place.id, dayIndex });
+    AccessibilityInfo.announceForAccessibility(
+      dayIndex == null
+        ? t('trips.a11yDayUnassigned', { name: place.name_en })
+        : t('trips.a11yDayAssigned', { name: place.name_en, n: dayIndex })
+    );
+  }
 
   // Seed each place into the place-detail cache so tapping a place opens offline
   // (place/[id] reads ['places','detail',id], a different key from the join
@@ -263,8 +305,9 @@ export default function TripDetailScreen() {
         </ScrollView>
       ) : (
         <FlashList
-          data={places ?? []}
-          keyExtractor={(item) => item.id}
+          data={rows}
+          keyExtractor={(row) => (row.type === 'header' ? `day-${row.day ?? 'un'}` : row.item.id)}
+          getItemType={(row) => row.type}
           contentContainerStyle={styles.listContent}
           ListHeaderComponent={
             <View style={styles.subheader}>
@@ -278,22 +321,81 @@ export default function TripDetailScreen() {
               )}
             </View>
           }
-          renderItem={({ item }) => (
-            <Swipeable
-              ref={(r) => {
-                swipeRefs.current[item.id] = r;
-              }}
-              renderRightActions={renderRightActions(item)}
-              overshootRight={false}
-              rightThreshold={40}
-            >
-              <PlaceCard
-                place={item}
-                onPress={(p) => router.push(placeHref(p.id, 'trip_detail'))}
-                distance={distanceFor(item)}
-              />
-            </Swipeable>
-          )}
+          renderItem={({ item: row }) =>
+            row.type === 'header' ? (
+              <View
+                style={styles.daySection}
+                accessibilityRole="header"
+                accessible
+                accessibilityLabel={
+                  row.day == null
+                    ? t('trips.a11yUngroupedSection', { count: row.placeCount })
+                    : t('trips.a11yDaySection', { n: row.day, count: row.placeCount })
+                }
+              >
+                <Text style={styles.daySectionTitle}>
+                  {row.day == null ? t('trips.ungrouped') : t('trips.day', { n: row.day })}
+                </Text>
+                <Text style={styles.daySectionCount}>
+                  {row.placeCount === 0
+                    ? t('trips.placeCount_zero')
+                    : t('trips.placeCount', { count: row.placeCount })}
+                </Text>
+              </View>
+            ) : (
+              <Swipeable
+                ref={(r) => {
+                  swipeRefs.current[row.item.id] = r;
+                }}
+                renderRightActions={renderRightActions(row.item)}
+                overshootRight={false}
+                rightThreshold={40}
+              >
+                <View>
+                  <PlaceCard
+                    place={row.item}
+                    onPress={(p) => router.push(placeHref(p.id, 'trip_detail'))}
+                    distance={distanceFor(row.item)}
+                  />
+                  {/* Day chip — the tap-to-assign affordance (M3 v1). */}
+                  <Pressable
+                    style={[styles.dayChip, row.item.day_index == null && styles.dayChipEmpty]}
+                    onPress={() => setDayPickerFor(row.item)}
+                    hitSlop={8}
+                    accessibilityRole="button"
+                    accessibilityLabel={t('trips.a11yDayChip', { name: row.item.name_en })}
+                  >
+                    <Ionicons
+                      name="calendar-outline"
+                      size={13}
+                      color={row.item.day_index == null ? c.textSecondary : c.textOnPrimary}
+                    />
+                    <Text
+                      style={[
+                        styles.dayChipText,
+                        row.item.day_index == null && { color: c.textSecondary },
+                      ]}
+                    >
+                      {row.item.day_index == null
+                        ? t('trips.dayChipUnassigned')
+                        : t('trips.day', { n: row.item.day_index })}
+                    </Text>
+                  </Pressable>
+                </View>
+              </Swipeable>
+            )
+          }
+        />
+      )}
+
+      {dayPickerFor && (
+        <DayPickerSheet
+          visible
+          placeName={dayPickerFor.name_en}
+          currentDay={dayPickerFor.day_index}
+          maxDay={maxDay}
+          onSelect={(d) => handleAssignDay(dayPickerFor, d)}
+          onClose={() => setDayPickerFor(null)}
         />
       )}
 
@@ -361,4 +463,35 @@ const createStyles = (c: AppColors) =>
       borderColor: c.border,
     },
     moveButtonDisabled: { opacity: 0.4 },
+    daySection: {
+      flexDirection: 'row',
+      alignItems: 'baseline',
+      gap: 8,
+      marginTop: 10,
+      marginBottom: 6,
+    },
+    daySectionTitle: { fontSize: 17, fontWeight: '700', color: c.textPrimary },
+    daySectionCount: { fontSize: 13, color: c.textTertiary },
+    // ≥44pt effective target (28 high + hitSlop 8). Sits above the card's
+    // top-right corner, clear of the card's own tap navigation. The chip is
+    // positioned relative to the row wrapper while PlaceCard insets itself
+    // 16 (marginHorizontal) — anchor inside the card edge: 16 + 8.
+    dayChip: {
+      position: 'absolute',
+      top: 8,
+      end: 24,
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 4,
+      minHeight: 28,
+      paddingHorizontal: 10,
+      borderRadius: 14,
+      backgroundColor: c.primary,
+    },
+    dayChipEmpty: {
+      backgroundColor: c.surface,
+      borderWidth: 1,
+      borderColor: c.border,
+    },
+    dayChipText: { fontSize: 12, fontWeight: '700', color: c.textOnPrimary },
   });

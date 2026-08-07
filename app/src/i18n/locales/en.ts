@@ -206,6 +206,18 @@ export default {
     a11yScopeChip: 'Searching in {{name}}',
     a11yScopeClearHint: 'Clears the trip filter and searches all places',
     a11yScopeCleared: 'Trip filter cleared. Searching all places.',
+    // Day grouping (M3 Wk1)
+    day: 'Day {{n}}',
+    ungrouped: 'Ungrouped',
+    newDay: 'New day (Day {{n}})',
+    assignDayTitle: 'Assign to a day',
+    dayChipUnassigned: '+ Day',
+    dayCapMessage: 'Trips can have up to {{max}} days.',
+    a11yDaySection: 'Day {{n}}, {{count}} places',
+    a11yUngroupedSection: 'Ungrouped, {{count}} places',
+    a11yDayChip: 'Assign {{name}} to a day',
+    a11yDayAssigned: '{{name}} moved to Day {{n}}',
+    a11yDayUnassigned: '{{name}} moved to Ungrouped',
   },
 
   // Display-time Google photos layer (zero-photo places)

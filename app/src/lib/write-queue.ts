@@ -31,7 +31,8 @@ export type WriteOp =
   | 'default_trip_create'
   | 'place_add'
   | 'place_remove'
-  | 'place_reposition';
+  | 'place_reposition'
+  | 'place_day_assign';
 
 export interface WriteQueueEntry {
   uid: string; // unique per queue entry — the ack-and-remove key
@@ -310,6 +311,7 @@ function entityListId(e: WriteQueueEntry): string | null {
     case 'place_add':
     case 'place_remove':
     case 'place_reposition':
+    case 'place_day_assign':
       return (p?.list_id as string) ?? null;
     default:
       return null;
@@ -371,21 +373,22 @@ export function coalesceQueue(entries: WriteQueueEntry[]): WriteQueueEntry[] {
     drop.add(e.uid);
   }
 
-  // Rule E — multiple repositions of the same (list_id, place_id): the
-  // position value is absolute, so only the last one matters (kept in its
-  // original slot, like renames). A surviving reposition whose membership
-  // pair nets out to "removed" via Rule D is harmless: the UPDATE matches
-  // zero rows server-side (idempotent no-op), so no extra rule is needed.
-  const lastRepositionUid = new Map<string, string>();
+  // Rule E — absolute-value ops on the same (op, list_id, place_id) collapse
+  // last-write-wins (kept in the last one's original slot, like renames):
+  // repositions (M2) and day-assigns (M3). A survivor whose membership pair
+  // nets out to "removed" via Rule D is harmless: the UPDATE matches zero
+  // rows server-side (idempotent no-op), so no extra rule is needed.
+  const LAST_WINS_OPS: WriteOp[] = ['place_reposition', 'place_day_assign'];
+  const lastAbsUid = new Map<string, string>();
   for (const e of entries) {
-    if (e.op !== 'place_reposition' || drop.has(e.uid)) continue;
+    if (!LAST_WINS_OPS.includes(e.op) || drop.has(e.uid)) continue;
     const p = e.payload as { list_id: string; place_id: string };
-    lastRepositionUid.set(`${p.list_id}:${p.place_id}`, e.uid);
+    lastAbsUid.set(`${e.op}:${p.list_id}:${p.place_id}`, e.uid);
   }
   for (const e of entries) {
-    if (e.op !== 'place_reposition' || drop.has(e.uid)) continue;
+    if (!LAST_WINS_OPS.includes(e.op) || drop.has(e.uid)) continue;
     const p = e.payload as { list_id: string; place_id: string };
-    if (lastRepositionUid.get(`${p.list_id}:${p.place_id}`) !== e.uid) drop.add(e.uid);
+    if (lastAbsUid.get(`${e.op}:${p.list_id}:${p.place_id}`) !== e.uid) drop.add(e.uid);
   }
 
   // Rule D — add → (later) remove of the same (list_id, place_id) while the
