@@ -68,7 +68,7 @@ def cmd_run(
     q = (
         supa()
         .table("places_staging")
-        .select("id, city, name_en, address_en, source")
+        .select("id, city, name_en, address_en, source, description, proposed_halal_level")
         .eq("reviewed", True)
         .eq("approved", True)
         .is_("promoted_to_place_id", "null")
@@ -81,6 +81,24 @@ def cmd_run(
     if not rows:
         print("[yellow]Nothing to promote.[/]")
         return
+
+    # Trust gate (WS4): never promote a sub-level-4 row whose description
+    # asserts certification (or prayer/mosque framing). "Certified" enters only
+    # via a real level-4 promotion, never free text. Held rows stay in staging
+    # for the description to be fixed; the rest promote normally.
+    from report import freetext_violations
+
+    held = [
+        (r, freetext_violations(r.get("description")))
+        for r in rows
+        if (r.get("proposed_halal_level") or 1) < 4 and freetext_violations(r.get("description"))
+    ]
+    if held:
+        print(f"[red]⚠ Holding {len(held)} row(s) — forbidden description claims on sub-level-4:[/]")
+        for r, v in held:
+            print(f"  ✗ {r['name_en'][:40]} → {', '.join(v)}")
+        held_ids = {r["id"] for r, _ in held}
+        rows = [r for r in rows if r["id"] not in held_ids]
 
     print(f"[bold]{len(rows)} row(s) ready to promote[/]")
     ph.capture("promote_run_started", {"city": city, "eligible_count": len(rows), "dry_run": dry_run})

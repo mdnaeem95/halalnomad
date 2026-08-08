@@ -18,6 +18,7 @@ Usage:
 
 from __future__ import annotations
 
+import re
 from collections import Counter
 from typing import Any
 
@@ -61,6 +62,32 @@ FOOD_SIGNAL_REGEX = (
     r"restaurant|eatery|diner|bistro|grill|kebab|shawarma|doner|kofte|pita|"
     r"kitchen|food|halal|cuisine|料理|餐廳|餐館|食堂|小吃|烤肉|牛肉麵"
 )
+
+# --- Free-text trust lint (WS4, data-accuracy program 2026-08-08) ------------
+# A stored, in-app-rendered free-text field (description today; any future
+# rendered free text) on a row BELOW level 4 may never assert certification —
+# that's the Coconut Club incident (a demo description claimed "Halal-certified"
+# on a level-1 row). Also block prayer/mosque scope-creep per the brand
+# guardrail. "Certified" may only ever enter via a genuine level-4 promotion,
+# never as free text. NOTE: this is deliberately distinct from HALAL_MARKER_REGEX
+# above — "mosque" in a NAME helps DETECT a halal venue (fine); "mosque" in a
+# stored DESCRIPTION is the guardrail violation this catches.
+FORBIDDEN_FREETEXT_REGEX = re.compile(
+    r"certif|"           # certified / certification (the trust violation)
+    r"\bprayer\b|"       # prayer room / prayer facilities (scope guardrail)
+    r"mosque|masjid",    # mosque/masjid framing (scope guardrail)
+    re.IGNORECASE,
+)
+
+
+def freetext_violations(text: str | None) -> list[str]:
+    """Return the distinct forbidden tokens found in a free-text field, or []
+    if clean. Caller decides severity; used by the lint command and as the
+    promote-time gate so no sub-level-4 row ships a certification claim."""
+    if not text:
+        return []
+    return sorted({m.group(0).lower() for m in FORBIDDEN_FREETEXT_REGEX.finditer(text)})
+
 
 # Non-halal chains that consistently appear in scrapes. Lowercase, regex.
 REJECT_NAME_REGEX = (
@@ -273,6 +300,53 @@ def cmd_auto_reject(
         }
     ).in_("id", ids).execute()
     print(f"[green]✓ Rejected {len(ids)} rows.[/]")
+
+
+@app.command("lint")
+def cmd_lint(
+    city: str = typer.Option(None, help="Filter to one city (default: whole catalog)"),
+) -> None:
+    """Scan stored free text for forbidden claims on sub-level-4 rows.
+
+    Flags any active `places` row (and any `places_staging` row) below level 4
+    whose description asserts certification (certif*) or prayer/mosque framing.
+    A description may never claim what the trust level doesn't hold — the
+    Coconut Club incident (2026-08-08). Should report clean after the WS2 purge.
+    """
+    total_violations = 0
+    for table, level_col, active_filter in (
+        ("places", "halal_level", ("is_active", True)),
+        ("places_staging", "proposed_halal_level", None),
+    ):
+        # Filter to the only rows that CAN violate — a non-null description on a
+        # sub-level-4 row — server-side, so the scan is complete regardless of
+        # the client's 1000-row page cap (a full-table select would silently
+        # miss rows past 1000; the lint must never false-"clean").
+        q = (
+            supa()
+            .table(table)
+            .select(f"id, name_en, city, description, {level_col}")
+            .not_.is_("description", "null")
+            .lt(level_col, 4)
+        )
+        if city:
+            q = q.eq("city", city)
+        if active_filter:
+            q = q.eq(*active_filter)
+        rows = q.execute().data or []
+        hits = [(r, freetext_violations(r.get("description"))) for r in rows]
+        hits = [(r, v) for r, v in hits if v]
+        print(f"[bold]{table}[/]: {len(hits)} violation(s) across {len(rows)} described sub-L4 rows")
+        for r, v in hits:
+            print(f"  [red]✗[/] {r.get('city','?')} | {r['name_en'][:40]} → {', '.join(v)}")
+            print(f"      {r.get('description','')[:120]}")
+        total_violations += len(hits)
+
+    if total_violations == 0:
+        print("[green]✓ Clean — no forbidden free-text claims on sub-level-4 rows.[/]")
+    else:
+        print(f"[red]✗ {total_violations} row(s) need fixing.[/]")
+        raise typer.Exit(code=1)
 
 
 if __name__ == "__main__":
