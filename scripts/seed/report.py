@@ -319,21 +319,30 @@ def cmd_lint(
         ("places_staging", "proposed_halal_level", None),
     ):
         # Filter to the only rows that CAN violate — a non-null description on a
-        # sub-level-4 row — server-side, so the scan is complete regardless of
-        # the client's 1000-row page cap (a full-table select would silently
-        # miss rows past 1000; the lint must never false-"clean").
-        q = (
-            supa()
-            .table(table)
-            .select(f"id, name_en, city, description, {level_col}")
-            .not_.is_("description", "null")
-            .lt(level_col, 4)
-        )
-        if city:
-            q = q.eq("city", city)
-        if active_filter:
-            q = q.eq(*active_filter)
-        rows = q.execute().data or []
+        # sub-level-4 row — AND paginate: the described sub-L4 set can exceed the
+        # client's 1000-row page cap (it does once descriptions are backfilled
+        # catalog-wide), so a single .execute() would silently miss rows past
+        # 1000 and false-"clean". The lint must scan every row.
+        rows = []
+        page = 0
+        while True:
+            q = (
+                supa()
+                .table(table)
+                .select(f"id, name_en, city, description, {level_col}")
+                .not_.is_("description", "null")
+                .lt(level_col, 4)
+                .range(page * 1000, page * 1000 + 999)
+            )
+            if city:
+                q = q.eq("city", city)
+            if active_filter:
+                q = q.eq(*active_filter)
+            batch = q.execute().data or []
+            rows.extend(batch)
+            if len(batch) < 1000:
+                break
+            page += 1
         hits = [(r, freetext_violations(r.get("description"))) for r in rows]
         hits = [(r, v) for r, v in hits if v]
         print(f"[bold]{table}[/]: {len(hits)} violation(s) across {len(rows)} described sub-L4 rows")
