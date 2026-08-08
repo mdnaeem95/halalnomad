@@ -500,7 +500,7 @@ export default function PlaceDetailScreen() {
           {place.is_featured && place.featured_tier && (
             <FeaturedBadge tier={place.featured_tier} />
           )}
-          <HalalBadge level={place.halal_level} />
+          <HalalBadge level={place.effective_halal_level ?? place.halal_level} />
           {place.verification_count > 0 && (
             <Text style={[styles.verificationCount, { color: c.textTertiary }]}>
               {place.verification_count} {place.verification_count === 1 ? 'verification' : 'verifications'}
@@ -625,10 +625,10 @@ export default function PlaceDetailScreen() {
           <View style={styles.detailRow}>
             <Text style={[styles.detailLabel, { color: c.textTertiary }]}>Trust level</Text>
             <Text style={[styles.detailValue, { color: c.textPrimary }]}>
-              {HALAL_LEVEL_LABELS[place.halal_level]}
+              {HALAL_LEVEL_LABELS[place.effective_halal_level ?? place.halal_level]}
             </Text>
             <Text style={[styles.howWeKnowExplainer, { color: c.textSecondary }]}>
-              {trustLevelExplainer(place.halal_level, place.verification_count)}
+              {trustLevelExplainer(place.effective_halal_level ?? place.halal_level, place.verification_count)}
             </Text>
           </View>
         </View>

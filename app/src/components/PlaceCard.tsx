@@ -63,7 +63,7 @@ export function PlaceCard({ place, onPress, distance, headerAccessory }: Props) 
           <Text style={[styles.name, { color: c.textPrimary }]} numberOfLines={1}>
             {place.name_en}
           </Text>
-          <HalalBadge level={place.halal_level} compact />
+          <HalalBadge level={place.effective_halal_level ?? place.halal_level} compact />
           {headerAccessory}
         </View>
 

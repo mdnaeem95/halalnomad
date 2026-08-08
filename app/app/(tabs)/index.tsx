@@ -242,7 +242,7 @@ export default function ExploreScreen() {
                 onPress={() => handleMarkerPress(place)}
               >
                 <MapPin
-                  halalLevel={place.halal_level}
+                  halalLevel={place.effective_halal_level ?? place.halal_level}
                   isFeatured={place.is_featured}
                 />
               </Marker>

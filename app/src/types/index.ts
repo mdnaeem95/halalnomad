@@ -157,7 +157,10 @@ export interface Place {
   coord_system: CoordinateSystem;
   cuisine_type: CuisineType;
   price_range: PriceRange | null;
-  halal_level: HalalLevel;
+  halal_level: HalalLevel; // community-earned level (1–3); drives community-progress copy
+  // Displayed trust level = max(community, 4-if-cert-current), computed server-side
+  // (migration 027). Optional for cache back-compat; read via `?? halal_level`.
+  effective_halal_level?: HalalLevel;
   description: string | null;
   hours: string | null;
   photos: string[];
