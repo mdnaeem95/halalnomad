@@ -2,8 +2,7 @@
 
 Date: 2026-08-09. Responds to: the pilot brief. Status: **SHIPPED — Singapore has 51 Trusted places live.** 027 applied +
 verified; audit approved; 51 promoted; app read-path flipped; descriptions
-backfilled catalog-wide (the ADR earned-trust rule: nothing
-Trusted until you audit). Commit `dc831a4`; audit list:
+backfilled catalog-wide. Commit `dc831a4`; audit list:
 `pilot-sg-muis-audit-list.md`.
 
 ## Task 1 — Migration 027 (written; you apply — I have no DDL access)
@@ -144,5 +143,9 @@ and THIDA (Taipei).
 backed by auditable, lapsing-capable MUIS provenance, from zero. The loop
 (fresh-token harvest → postal+name reconcile → human audit → promote → 027
 expiry lifecycle) is proven and templates to CICOT (Bangkok) and THIDA (Taipei).
-Bonus supply awaits a MUIS bulk dataset (none public per Sani); the search API
-can't enumerate the full register.
+**Correction to the Task-4 finding:** the search API caps at 200/query, but a
+systematic character sweep DOES enumerate the register (36 single-char queries
+surfaced 1,051 unique establishments, deduped by cert number). So MUIS-first
+ingestion (start from the register, geocode via Google, publish as Trusted) is
+feasible — proposed separately (`planning/muis-first-sweep-proposal.md`) as a
+scoped, curation-preserving Restaurant-only sweep, not a full-register dump.
