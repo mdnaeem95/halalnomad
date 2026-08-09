@@ -77,8 +77,13 @@ SEOUL = [
 ]
 
 BANGKOK = [
+    # Thai-Muslim heartland — added 2026-08 (was absent; 0 of 143 places, yet
+    # the live /bangkok page frames it as "the real thing"). Swept FIRST.
+    District("Ramkhamhaeng", 13.7556, 100.6215),  # Thai-Muslim quarter, halal-by-default
+    District("Hua Mak", 13.7522, 100.6430),        # adjacent Muslim community
     District("Bang Rak", 13.7273, 100.5167),    # historic Muslim area
     District("Phra Khanong", 13.7140, 100.5980),  # mosque cluster
+    District("Nana", 13.7405, 100.5560),          # Sukhumvit Soi 3 Arab quarter
     District("Sukhumvit", 13.7390, 100.5601),
     District("Silom", 13.7245, 100.5341),
     District("Siam", 13.7460, 100.5339),

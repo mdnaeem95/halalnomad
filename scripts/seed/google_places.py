@@ -56,16 +56,28 @@ DETAILS_URL = "https://maps.googleapis.com/maps/api/place/details/json"
 RATE_LIMIT_SLEEP_S = 0.2
 
 
+# Google's legacy Places API (being sunset) intermittently returns these on
+# well-formed requests; retry with backoff before giving up.
+_RETRYABLE_STATUSES = ("UNKNOWN_ERROR", "INVALID_REQUEST")
+
+
 def _get(client: httpx.Client, url: str, params: dict[str, Any]) -> dict[str, Any]:
     params = {**params, "key": google_api_key()}
-    r = client.get(url, params=params, timeout=30.0)
-    r.raise_for_status()
-    data = r.json()
-    status = data.get("status")
-    if status not in ("OK", "ZERO_RESULTS"):
-        raise RuntimeError(f"Google API error: {status} — {data.get('error_message', '')}")
-    time.sleep(RATE_LIMIT_SLEEP_S)
-    return data
+    last_status = None
+    for attempt in range(4):
+        r = client.get(url, params=params, timeout=30.0)
+        r.raise_for_status()
+        data = r.json()
+        status = data.get("status")
+        if status in ("OK", "ZERO_RESULTS"):
+            time.sleep(RATE_LIMIT_SLEEP_S)
+            return data
+        last_status = status
+        if status in _RETRYABLE_STATUSES and attempt < 3:
+            time.sleep(0.5 * (attempt + 1))
+            continue
+        break
+    raise RuntimeError(f"Google API error: {last_status} — {(data or {}).get('error_message', '')}")
 
 
 # --- Search -----------------------------------------------------------------
@@ -92,6 +104,9 @@ CUISINE_SEARCH_KEYWORDS: list[str] = [
                       # too much non-halal, so we target the halal-leaning subsets.
     "turkish",
     "uyghur",
+    "arab",           # added Bangkok run (2026-08): Nana/Sukhumvit Soi 3 Arab
+    "yemeni",         # quarter. Weak-ethnonym guard holds "arab" for review if
+                      # no food signal; both surface Middle Eastern halal broadly.
 ]
 
 
@@ -166,6 +181,10 @@ DETAILS_FIELDS = ",".join(
         "price_level",
         "types",
         "url",
+        # Standing rule since the Seoul run (2026-07-30): seeded data rots fast
+        # (Naritaya + 3/4 KMF listings were closed). business_status is a legacy
+        # Basic field — rides this existing details call, no extra cost.
+        "business_status",
     ]
 )
 
@@ -349,6 +368,12 @@ def stage_row(
         "city": city,
         "country": get_country(city),
         "search_query": f'"{nr.search_keyword}" near {district.name}, {city}',
+        # Uniform review-status keys so a mixed batch (some rows pre-rejected by
+        # the business_status gate) upserts without NULLing the NOT-NULL
+        # `reviewed` column on the pending rows. Caller overrides for closures.
+        "reviewed": False,
+        "approved": None,
+        "rejected_reason": None,
     }
 
 
@@ -384,6 +409,8 @@ def cmd_scrape(
         "dup_in_staging": 0,
         "dup_in_places": 0,
         "staged": 0,
+        "closed_permanently": 0,  # staged pre-rejected (business_status)
+        "closed_temporarily": 0,  # staged with a [temp-closed] flag
     }
     rows_to_insert: list[dict[str, Any]] = []
     seen_place_ids: set[str] = set()  # in-batch dedup; districts often overlap
@@ -436,7 +463,22 @@ def cmd_scrape(
                     summary["details_skipped"] += 1
                     details = None
 
-                rows_to_insert.append(stage_row(nr, details, district, city))
+                # business_status gate (standing rule): a permanently-closed
+                # place is staged pre-rejected (recorded so future sweeps dedup
+                # it, but never costs a review minute); a temporarily-closed one
+                # is staged with a flag for the reviewer.
+                bstatus = (details or {}).get("business_status")
+                row = stage_row(nr, details, district, city)
+                if bstatus == "CLOSED_PERMANENTLY":
+                    row.update(
+                        reviewed=True, approved=False,
+                        rejected_reason="permanently closed (business_status)",
+                    )
+                    summary["closed_permanently"] += 1
+                elif bstatus == "CLOSED_TEMPORARILY":
+                    row["search_query"] += " [temp-closed]"
+                    summary["closed_temporarily"] += 1
+                rows_to_insert.append(row)
                 summary["staged"] += 1
 
             progress.remove_task(task)

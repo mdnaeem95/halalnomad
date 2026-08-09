@@ -53,4 +53,15 @@ def capture_exception(exc: Exception) -> None:
     client = ph()
     if client is None:
         return
-    client.capture_exception(exc, DISTINCT_ID)
+    # Telemetry must never crash a sweep. The client's capture_exception
+    # signature varies by posthog version (distinct_id positional vs kwarg);
+    # try the kwarg form, then bare, and swallow anything.
+    try:
+        client.capture_exception(exc, distinct_id=DISTINCT_ID)
+    except TypeError:
+        try:
+            client.capture_exception(exc)
+        except Exception:
+            pass
+    except Exception:
+        pass

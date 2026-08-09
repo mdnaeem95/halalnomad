@@ -46,7 +46,8 @@ APPROVE_NAME_REGEX = (
     r"清真|"            # Chinese: halal (huí cuisine)
     r"ハラル|ハラール|"  # Japanese: halal (two common spellings)
     r"할랄|이슬람|무슬림|"  # Korean: halal / Islam / Muslim
-    r"ฮาลาล"            # Thai: halal
+    r"ฮาลาล|"           # Thai: halal
+    r"มุสลิม|อาหารมุสลิม"  # Thai: Muslim / Muslim food (self-labels, added Bangkok run)
 )
 APPROVE_CUISINES = ("middle_eastern", "indian", "malay_indonesian", "chinese_muslim", "central_asian")
 
