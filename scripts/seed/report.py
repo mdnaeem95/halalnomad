@@ -303,6 +303,93 @@ def cmd_auto_reject(
     print(f"[green]✓ Rejected {len(ids)} rows.[/]")
 
 
+@app.command("reviews")
+def cmd_reviews(
+    city: str = typer.Argument(..., help="City key (lowercase)"),
+    limit: int = typer.Option(200, help="Max pending rows to scan."),
+) -> None:
+    """Review-time helper: scan Google reviews of PENDING rows for halal signals.
+
+    Automates the manual "do recent reviews mention halal?" pass. For each
+    pending row it fetches Google reviews (New API, Enterprise/Atmosphere tier
+    — a few $/thousand), flags halal-positive mentions and RED flags
+    (pork/alcohol/not-halal), and prints a per-place summary + snippet.
+
+    ToS: reviews are fetched at review-time and DISCARDED — never stored (same
+    line as the photos decision). This is ephemeral decision-support, not a
+    cache. Nothing here writes review text to the DB.
+    """
+    import os
+    import time
+    import httpx
+
+    api_key = os.environ.get("GOOGLE_MAPS_NEW_API_KEY") or os.environ.get(
+        "EXPO_PUBLIC_GOOGLE_MAPS_API_KEY"
+    )
+    if not api_key:
+        # fall back to the app's env if the seed .env doesn't carry the New-API key
+        from pathlib import Path
+
+        app_env = Path(__file__).resolve().parents[2] / "app" / ".env"
+        if app_env.exists():
+            for line in app_env.read_text().splitlines():
+                if line.startswith("EXPO_PUBLIC_GOOGLE_MAPS_API_KEY="):
+                    api_key = line.split("=", 1)[1].strip()
+    if not api_key:
+        print("[red]No New-API key found (EXPO_PUBLIC_GOOGLE_MAPS_API_KEY).[/]")
+        raise typer.Exit(1)
+
+    rows = (
+        supa()
+        .table("places_staging")
+        .select("name_en, source_id")
+        .eq("city", city.lower())
+        .eq("reviewed", False)
+        .eq("source", "google_places")
+        .limit(limit)
+        .execute()
+        .data
+        or []
+    )
+    print(f"[bold]Scanning reviews for {len(rows)} pending {city} rows[/] (Enterprise tier)\n")
+
+    pos = re.compile(r"\bhalal\b|muslim[- ]friendly|muslim owned", re.IGNORECASE)
+    red = re.compile(r"not halal|non[- ]halal|pork|bacon|lard|alcohol|beer|serves? wine", re.IGNORECASE)
+    scanned = signalled = 0
+    with httpx.Client(timeout=25) as client:
+        for r in rows:
+            pid = r["source_id"]
+            try:
+                resp = client.get(
+                    f"https://places.googleapis.com/v1/places/{pid}",
+                    headers={"X-Goog-Api-Key": api_key, "X-Goog-FieldMask": "id,reviews"},
+                )
+                reviews = resp.json().get("reviews", []) if resp.status_code == 200 else []
+            except Exception:
+                reviews = []
+            scanned += 1
+            pos_hits = []
+            red_hits = []
+            for rv in reviews:
+                txt = (rv.get("text") or {}).get("text") or (rv.get("originalText") or {}).get("text") or ""
+                if pos.search(txt):
+                    i = txt.lower().find("halal")
+                    pos_hits.append(txt[max(0, i - 35) : i + 55].replace("\n", " ").strip())
+                if red.search(txt):
+                    m = red.search(txt)
+                    red_hits.append(txt[max(0, m.start() - 30) : m.start() + 40].replace("\n", " ").strip())
+            if pos_hits or red_hits:
+                signalled += 1
+                tag = "[red]⚠ RED[/]" if red_hits else "[green]✓ halal[/]"
+                print(f"{tag} {r['name_en'][:44]}  ({len(pos_hits)} halal / {len(red_hits)} flag)")
+                if pos_hits:
+                    print(f"    ✓ …{pos_hits[0]}…")
+                if red_hits:
+                    print(f"    [red]⚠ …{red_hits[0]}…[/]")
+            time.sleep(0.14)  # polite rate-limit
+    print(f"\n[dim]scanned {scanned} | {signalled} had a halal/red signal in reviews[/]")
+
+
 @app.command("lint")
 def cmd_lint(
     city: str = typer.Option(None, help="Filter to one city (default: whole catalog)"),
