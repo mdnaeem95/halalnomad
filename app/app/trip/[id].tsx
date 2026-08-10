@@ -24,6 +24,7 @@ import { Toast } from '../../src/components/AppDialog';
 import { placeHref } from '../../src/lib/navigation';
 import { haversineKm, formatDistance } from '../../src/lib/distance';
 import { track, EVENTS } from '../../src/lib/analytics';
+import { computeWithinDayMove } from '../../src/lib/trip-reorder';
 import { ListPlace } from '../../src/types';
 
 export default function TripDetailScreen() {
@@ -133,52 +134,49 @@ export default function TripDetailScreen() {
     );
   }
 
-  /** Move a place one slot up/down. New position = midpoint of its new
-   *  neighbours in the 1000-step space; when the gap is exhausted (<2 apart),
-   *  re-space the whole list to (i+1)*1000 through the queue. */
-  function movePlace(index: number, dir: -1 | 1) {
-    if (!id || !places) return;
-    const target = index + dir;
-    if (target < 0 || target >= places.length) return;
-    const item = places[index];
-
-    const rest = places.filter((_, i) => i !== index);
-    const prevNeighbour = target > 0 ? rest[target - 1] : null;
-    const nextNeighbour = target < rest.length ? rest[target] : null;
-
-    let position: number;
-    if (!prevNeighbour) position = (nextNeighbour?.position ?? 0) - 1000;
-    else if (!nextNeighbour) position = prevNeighbour.position + 1000;
-    else position = Math.floor((prevNeighbour.position + nextNeighbour.position) / 2);
-
-    Haptics.selectionAsync();
-
-    const collided =
-      (prevNeighbour && position <= prevNeighbour.position) ||
-      (nextNeighbour && position >= nextNeighbour.position);
-
-    if (collided) {
-      const newOrder = [...rest.slice(0, target), item, ...rest.slice(target)];
-      reorderPlace.mutate({
-        listId: id,
-        placeId: item.id,
-        position: (target + 1) * 1000,
-        fromIndex: index,
-        toIndex: target,
-        respace: newOrder.map((p, i) => ({ placeId: p.id, position: (i + 1) * 1000 })),
-      });
-    } else {
-      reorderPlace.mutate({
-        listId: id,
-        placeId: item.id,
-        position,
-        fromIndex: index,
-        toIndex: target,
-      });
+  // Edit-mode sections. When the trip has days, edit mode mirrors the read
+  // view's grouping so reorder is within-day (a row can't cross a header —
+  // between-day movement is the chip→picker's job). A dayless trip is one
+  // implicit section (day null) and renders exactly like the M2 flat list.
+  const editSections = useMemo(() => {
+    const ps = [...(places ?? [])].sort((a, b) => a.position - b.position);
+    if (!anyDays) return [{ day: null as number | null, items: ps }];
+    const out: { day: number | null; items: ListPlace[] }[] = [];
+    for (let d = 1; d <= maxDay; d += 1) {
+      out.push({ day: d, items: ps.filter((p) => p.day_index === d) });
     }
-    AccessibilityInfo.announceForAccessibility(
-      t('trips.a11yMovedAnnounce', { name: item.name_en, pos: target + 1, count: places.length })
-    );
+    const ung = ps.filter((p) => p.day_index == null);
+    if (ung.length > 0) out.push({ day: null, items: ung });
+    return out;
+  }, [places, anyDays, maxDay]);
+
+  /** Move a place one slot up/down WITHIN its day section. Delegates the
+   *  1000-step midpoint + whole-trip re-space math to computeWithinDayMove so
+   *  the (future) drag path shares it. Section-scoped: an edge move is a no-op.
+   *  Fires trip_list_day_reordered when day-grouped, else the flat M2 event. */
+  function move(dayIndex: number | null, sectionIdx: number, dir: -1 | 1) {
+    if (!id || !places) return;
+    const r = computeWithinDayMove(places, dayIndex, sectionIdx, dir);
+    if (!r) return;
+    const item = places.find((p) => p.id === r.placeId);
+    Haptics.selectionAsync();
+    reorderPlace.mutate({
+      listId: id,
+      placeId: r.placeId,
+      position: r.position,
+      fromIndex: r.fromIndex,
+      toIndex: r.toIndex,
+      respace: r.respace,
+      // day-scoped only when the trip actually has days (dayless => flat event)
+      ...(anyDays ? { dayIndex } : {}),
+      via: 'arrows',
+    });
+    const sectionLen = editSections.find((s) => s.day === dayIndex)?.items.length ?? 0;
+    if (item) {
+      AccessibilityInfo.announceForAccessibility(
+        t('trips.a11yMovedAnnounce', { name: item.name_en, pos: r.toIndex + 1, count: sectionLen })
+      );
+    }
   }
 
   const renderRightActions = (place: ListPlace) => () =>
@@ -261,6 +259,10 @@ export default function TripDetailScreen() {
         // move on device. Trip lists are small (soft-capped world), so a
         // ScrollView with per-place keys keeps rows stable — a move swaps two
         // children in place and the scroll offset never shifts.
+        //
+        // M3 Wk2: grouped by day so arrows are section-scoped (up/down move
+        // within a day only; disabled at the section's ends — a row never
+        // crosses a header). Section headers only render when the trip has days.
         <ScrollView contentContainerStyle={styles.listContent}>
           <View style={styles.subheader}>
             <Text style={styles.subheaderCount}>
@@ -272,34 +274,66 @@ export default function TripDetailScreen() {
               </View>
             )}
           </View>
-          {(places ?? []).map((item, index) => (
-            <View key={item.id} style={styles.editRow}>
-              <View style={styles.editCard} pointerEvents="none">
-                {/* Navigation is parked while editing; onPress is a no-op. */}
-                <PlaceCard place={item} onPress={() => {}} distance={distanceFor(item)} />
-              </View>
-              <View style={styles.moveControls}>
-                <Pressable
-                  style={[styles.moveButton, index === 0 && styles.moveButtonDisabled]}
-                  onPress={() => movePlace(index, -1)}
-                  disabled={index === 0}
-                  accessibilityRole="button"
-                  accessibilityLabel={t('trips.a11yMoveUp', { name: item.name_en })}
-                  accessibilityState={{ disabled: index === 0 }}
+          {editSections.map((section) => (
+            <View key={`sec-${section.day ?? 'un'}`}>
+              {anyDays && (
+                <View
+                  style={styles.daySection}
+                  accessibilityRole="header"
+                  accessible
+                  accessibilityLabel={
+                    section.day == null
+                      ? t('trips.a11yUngroupedSection', { count: section.items.length })
+                      : t('trips.a11yDaySection', { n: section.day, count: section.items.length })
+                  }
                 >
-                  <Ionicons name="chevron-up" size={22} color={index === 0 ? c.textTertiary : c.primary} />
-                </Pressable>
-                <Pressable
-                  style={[styles.moveButton, index === count - 1 && styles.moveButtonDisabled]}
-                  onPress={() => movePlace(index, 1)}
-                  disabled={index === count - 1}
-                  accessibilityRole="button"
-                  accessibilityLabel={t('trips.a11yMoveDown', { name: item.name_en })}
-                  accessibilityState={{ disabled: index === count - 1 }}
-                >
-                  <Ionicons name="chevron-down" size={22} color={index === count - 1 ? c.textTertiary : c.primary} />
-                </Pressable>
-              </View>
+                  <Text style={styles.daySectionTitle}>
+                    {section.day == null ? t('trips.ungrouped') : t('trips.day', { n: section.day })}
+                  </Text>
+                  <Text style={styles.daySectionCount}>
+                    {section.items.length === 0
+                      ? t('trips.placeCount_zero')
+                      : t('trips.placeCount', { count: section.items.length })}
+                  </Text>
+                </View>
+              )}
+              {section.items.map((item, index) => (
+                <View key={item.id} style={styles.editRow}>
+                  <View style={styles.editCard} pointerEvents="none">
+                    {/* Navigation is parked while editing; onPress is a no-op. */}
+                    <PlaceCard place={item} onPress={() => {}} distance={distanceFor(item)} />
+                  </View>
+                  <View style={styles.moveControls}>
+                    <Pressable
+                      style={[styles.moveButton, index === 0 && styles.moveButtonDisabled]}
+                      onPress={() => move(section.day, index, -1)}
+                      disabled={index === 0}
+                      accessibilityRole="button"
+                      accessibilityLabel={t('trips.a11yMoveUp', { name: item.name_en })}
+                      accessibilityState={{ disabled: index === 0 }}
+                    >
+                      <Ionicons name="chevron-up" size={22} color={index === 0 ? c.textTertiary : c.primary} />
+                    </Pressable>
+                    <Pressable
+                      style={[
+                        styles.moveButton,
+                        index === section.items.length - 1 && styles.moveButtonDisabled,
+                      ]}
+                      onPress={() => move(section.day, index, 1)}
+                      disabled={index === section.items.length - 1}
+                      accessibilityRole="button"
+                      accessibilityLabel={t('trips.a11yMoveDown', { name: item.name_en })}
+                      accessibilityState={{ disabled: index === section.items.length - 1 }}
+                    >
+                      <Ionicons
+                        name="chevron-down"
+                        size={22}
+                        color={index === section.items.length - 1 ? c.textTertiary : c.primary}
+                      />
+                    </Pressable>
+                  </View>
+                </View>
+              ))}
             </View>
           ))}
         </ScrollView>

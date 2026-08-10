@@ -104,10 +104,16 @@ export const EVENTS = {
   TRIP_LIST_OPENED: 'trip_list_opened',
   PLACE_SAVED_TO_LIST: 'place_saved_to_list',
   PLACE_REMOVED_FROM_LIST: 'place_removed_from_list',
-  // Trip Planning (M2 Wk3) — from_position/to_position are 0-based row indices
+  // Trip Planning (M2 Wk3) — flat-list reorder (trip with no days).
+  // from_position/to_position are 0-based row indices; via:'drag'|'arrows'.
   TRIP_LIST_PLACE_REORDERED: 'trip_list_place_reordered',
-  // Trip Planning (M3 Wk1) — day_index null = unassigned back to Ungrouped
+  // Trip Planning (M3 Wk1) — day_index null = unassigned back to Ungrouped.
+  // source:'auto' (auto-assign rule) | 'picker' (explicit DayPicker) — M3 Wk2.
   TRIP_LIST_DAY_ASSIGNED: 'trip_list_day_assigned',
+  // Trip Planning (M3 Wk2) — within-day reorder (section-scoped). day_index is
+  // the section (null = Ungrouped). from_position/to_position are section-local
+  // 0-based indices; via:'drag'|'arrows'.
+  TRIP_LIST_DAY_REORDERED: 'trip_list_day_reordered',
 
   // Engagement
   LANGUAGE_CHANGED: 'language_changed',

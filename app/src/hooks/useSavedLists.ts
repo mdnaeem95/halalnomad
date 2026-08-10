@@ -169,7 +169,7 @@ type ReorderVars = {
   /** Absolute new `position` value for the moved place (midpoint of its new
    *  neighbours in the 1000-step space). */
   position: number;
-  /** 0-based indices for the analytics event. */
+  /** 0-based indices for the analytics event (section-local when day-scoped). */
   fromIndex: number;
   toIndex: number;
   /** When the midpoint space is exhausted (adjacent positions differ by <2),
@@ -177,6 +177,12 @@ type ReorderVars = {
    *  position is written through the queue. The coalescer collapses repeated
    *  moves to one op per (list, place), so this stays cheap. */
   respace?: { placeId: string; position: number }[];
+  /** M3 Wk2: present (incl. explicit null for Ungrouped) => this was a
+   *  within-day reorder; fire trip_list_day_reordered with this day_index.
+   *  Absent => flat-list reorder; fire the legacy trip_list_place_reordered. */
+  dayIndex?: number | null;
+  /** Reorder mechanism, rides as an event property. */
+  via?: 'drag' | 'arrows';
 };
 
 export function useReorderPlace() {
@@ -225,13 +231,28 @@ export function useReorderPlace() {
       if (ctx?.prev && ctx?.listKey) queryClient.setQueryData(ctx.listKey, ctx.prev);
       captureError(err as Error, { mutation: 'reorderPlace' });
     },
-    onSuccess: (_data, { listId, placeId, fromIndex, toIndex }) => {
-      track(EVENTS.TRIP_LIST_PLACE_REORDERED, {
-        list_id: listId,
-        place_id: placeId,
-        from_position: fromIndex,
-        to_position: toIndex,
-      });
+    onSuccess: (_data, { listId, placeId, fromIndex, toIndex, dayIndex, via }) => {
+      // Day-scoped (within-day) reorders fire the M3 event with day_index;
+      // flat-list reorders keep the M2 event. `'dayIndex' in vars` — an
+      // explicit null (Ungrouped section) is day-scoped, undefined is flat.
+      if (dayIndex !== undefined) {
+        track(EVENTS.TRIP_LIST_DAY_REORDERED, {
+          list_id: listId,
+          place_id: placeId,
+          day_index: dayIndex,
+          from_position: fromIndex,
+          to_position: toIndex,
+          via: via ?? 'arrows',
+        });
+      } else {
+        track(EVENTS.TRIP_LIST_PLACE_REORDERED, {
+          list_id: listId,
+          place_id: placeId,
+          from_position: fromIndex,
+          to_position: toIndex,
+          via: via ?? 'arrows',
+        });
+      }
     },
     // Reconciliation fires post-commit from the write-queue onQueueIdle.
   });
@@ -269,10 +290,16 @@ export function useAssignDay() {
       captureError(err as Error, { mutation: 'assignDay' });
     },
     onSuccess: (_data, { listId, placeId, dayIndex }) => {
+      // source:'picker' — this hook is only ever the user's explicit DayPicker
+      // action. The auto-assign rule fires the same event with source:'auto'
+      // from useSaveToList (M3 Wk2 Task 0). Tiles filter to 'picker' for
+      // deliberate-usage; 'auto' rate signals whether single-day trips are the
+      // real-world norm.
       track(EVENTS.TRIP_LIST_DAY_ASSIGNED, {
         list_id: listId,
         place_id: placeId,
         day_index: dayIndex,
+        source: 'picker',
       });
     },
     // Reconciliation fires post-commit from the write-queue onQueueIdle.
@@ -502,7 +529,12 @@ export function useSaveToTrip() {
       const cached = queryClient.getQueryData<ListPlace[]>(
         savedPlaceKeys.listPlaces(listId)
       );
-      if (cached && cached.length > 0 && cached.every((p) => p.day_index === 1)) {
+      const autoAssigned = !!(
+        cached &&
+        cached.length > 0 &&
+        cached.every((p) => p.day_index === 1)
+      );
+      if (autoAssigned) {
         await enqueue('place_day_assign', `${listId}:${placeId}`, {
           list_id: listId,
           place_id: placeId,
@@ -510,6 +542,10 @@ export function useSaveToTrip() {
         });
       }
       void drainWriteQueue();
+      // Return the flag so the day_assigned{source:'auto'} event fires exactly
+      // once from onSuccess (M3 Wk2 Task 0) — not inline, where the mutation's
+      // retry could double-fire it. No backfill; property added going forward.
+      return { autoAssigned };
     },
     onMutate: async ({ placeId, listId, isFirst, title }) => {
       if (!user) return {};
@@ -553,7 +589,7 @@ export function useSaveToTrip() {
       if (ctx?.prevLists && ctx?.listsKey) queryClient.setQueryData(ctx.listsKey, ctx.prevLists);
       captureError(err as Error, { mutation: 'saveToTrip' });
     },
-    onSuccess: (_data, { placeId, listId, isFirst }) => {
+    onSuccess: (data, { placeId, listId, isFirst }) => {
       if (isFirst) {
         track(EVENTS.TRIP_LIST_CREATED, { list_id: listId, is_default: true, source: 'first_save' });
       }
@@ -562,6 +598,17 @@ export function useSaveToTrip() {
         list_id: listId,
         source_screen: 'place_detail',
       });
+      // Auto day-assign rule fired (all existing places were Day 1). The
+      // event mirrors the picker's, tagged source:'auto' — tiles filter to
+      // 'picker'; the 'auto' rate signals whether single-day trips are the norm.
+      if (data?.autoAssigned) {
+        track(EVENTS.TRIP_LIST_DAY_ASSIGNED, {
+          list_id: listId,
+          place_id: placeId,
+          day_index: 1,
+          source: 'auto',
+        });
+      }
     },
     // Reconciliation is fired post-commit from the write-queue (onQueueIdle).
   });
