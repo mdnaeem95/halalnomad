@@ -10,7 +10,7 @@
 import React from 'react';
 import { Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import * as Haptics from 'expo-haptics';
+import { haptics } from '../lib/haptics';
 import { useTranslation } from 'react-i18next';
 import { useTheme } from '../hooks/useTheme';
 import { DAY_SOFT_CAP } from '../hooks/useSavedLists';
@@ -37,7 +37,7 @@ export function DayPickerSheet({ visible, placeName, currentDay, maxDay, onSelec
   const canAddDay = newDay <= DAY_SOFT_CAP;
 
   function choose(day: number | null) {
-    Haptics.selectionAsync();
+    haptics.selection();
     onSelect(day);
     onClose();
   }
@@ -76,7 +76,12 @@ export function DayPickerSheet({ visible, placeName, currentDay, maxDay, onSelec
             </Pressable>
           </View>
 
-          <ScrollView bounces={false} showsVerticalScrollIndicator={false} style={styles.rows}>
+          <ScrollView
+            bounces={false}
+            showsVerticalScrollIndicator={false}
+            style={styles.rows}
+            accessibilityRole="radiogroup"
+          >
             {options.map((o) => {
               const selected = o.day === currentDay && !o.isNew;
               return (

@@ -11,7 +11,7 @@ import {
   View,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import * as Haptics from 'expo-haptics';
+import { haptics } from '../lib/haptics';
 import { useTheme } from '../hooks/useTheme';
 import { reviewSchema } from '../lib/schemas';
 import { AppColors, borderRadius, shadows, spacing, typography } from '../constants/theme';
@@ -47,7 +47,7 @@ export function ReviewModal({
   }, [visible]);
 
   function handleStarPress(value: number) {
-    Haptics.selectionAsync();
+    haptics.selection();
     setRating(value);
     setError(null);
   }

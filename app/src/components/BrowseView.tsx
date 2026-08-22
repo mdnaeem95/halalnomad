@@ -2,7 +2,7 @@ import React from 'react';
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
-import * as Haptics from 'expo-haptics';
+import { haptics } from '../lib/haptics';
 import { useCountriesWithCities } from '../hooks/usePlaces';
 import { useTheme } from '../hooks/useTheme';
 import { COUNTRY_FLAGS } from '../types';
@@ -23,7 +23,7 @@ export function BrowseView() {
   const styles = React.useMemo(() => createStyles(c), [c]);
 
   function handleCityPress(city: string) {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    haptics.impact();
     router.push(`/city/${encodeURIComponent(city)}`);
   }
 

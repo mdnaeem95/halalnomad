@@ -16,7 +16,7 @@ jest.mock('@react-native-async-storage/async-storage', () => ({
   __esModule: true,
   default: { getItem: jest.fn(), setItem: jest.fn(), removeItem: jest.fn() },
 }));
-jest.mock('../lib/sentry', () => ({ captureError: jest.fn() }));
+jest.mock('../lib/sentry', () => ({ captureError: jest.fn(), breadcrumb: jest.fn() }));
 
 let uidN = 0;
 function entry(op: WriteOp, clientId: string, payload: unknown): WriteQueueEntry {

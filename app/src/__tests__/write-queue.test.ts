@@ -35,7 +35,7 @@ jest.mock('@react-native-async-storage/async-storage', () => {
   };
 });
 
-jest.mock('../lib/sentry', () => ({ captureError: jest.fn() }));
+jest.mock('../lib/sentry', () => ({ captureError: jest.fn(), breadcrumb: jest.fn() }));
 
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import {

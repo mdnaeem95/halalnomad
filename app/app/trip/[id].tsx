@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { AccessibilityInfo, ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { FlashList } from '@shopify/flash-list';
-import * as Haptics from 'expo-haptics';
+import { haptics } from '../../src/lib/haptics';
 import { Swipeable } from 'react-native-gesture-handler';
 import { Ionicons } from '@expo/vector-icons';
 import { Stack, router, useLocalSearchParams } from 'expo-router';
@@ -159,7 +159,7 @@ export default function TripDetailScreen() {
     const r = computeWithinDayMove(places, dayIndex, sectionIdx, dir);
     if (!r) return;
     const item = places.find((p) => p.id === r.placeId);
-    Haptics.selectionAsync();
+    haptics.selection();
     reorderPlace.mutate({
       listId: id,
       placeId: r.placeId,
@@ -173,9 +173,19 @@ export default function TripDetailScreen() {
     });
     const sectionLen = editSections.find((s) => s.day === dayIndex)?.items.length ?? 0;
     if (item) {
-      AccessibilityInfo.announceForAccessibility(
-        t('trips.a11yMovedAnnounce', { name: item.name_en, pos: r.toIndex + 1, count: sectionLen })
-      );
+      // Name the section in the announcement when the trip has days, so a
+      // VoiceOver user knows which day the row landed in (M3 Wk-3 A11y sweep).
+      const announce = !anyDays
+        ? t('trips.a11yMovedAnnounce', { name: item.name_en, pos: r.toIndex + 1, count: sectionLen })
+        : dayIndex == null
+          ? t('trips.a11yMovedInUngrouped', { name: item.name_en, pos: r.toIndex + 1, count: sectionLen })
+          : t('trips.a11yMovedInDay', {
+              name: item.name_en,
+              pos: r.toIndex + 1,
+              count: sectionLen,
+              day: dayIndex,
+            });
+      AccessibilityInfo.announceForAccessibility(announce);
     }
   }
 
@@ -216,7 +226,7 @@ export default function TripDetailScreen() {
             )}
             <Pressable
               onPress={() => {
-                Haptics.selectionAsync();
+                haptics.selection();
                 setEditMode((v) => !v);
               }}
               hitSlop={10}

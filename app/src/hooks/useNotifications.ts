@@ -8,6 +8,7 @@ import { supabase } from '../lib/supabase';
 import { saveUserTimezone, touchLastActive } from '../lib/notifications';
 import { track, EVENTS } from '../lib/analytics';
 import { placeHref } from '../lib/navigation';
+import { captureError } from '../lib/sentry';
 
 const HEARTBEAT_MIN_INTERVAL_MS = 60 * 60 * 1000; // throttle to once per hour
 
@@ -53,19 +54,33 @@ async function registerForPushNotifications(): Promise<string | null> {
   if (finalStatus !== 'granted') return null;
 
   const projectId = Constants.expoConfig?.extra?.eas?.projectId;
-  const tokenData = await Notifications.getExpoPushTokenAsync(
-    projectId ? { projectId } : {},
-  );
+  // getExpoPushTokenAsync throws on some devices — no Play Services, APNs
+  // unavailable, a build missing the EAS projectId, or the native module
+  // returning an unexpected shape (the source of the 21× "fetching Expo token:
+  // TypeError", reviews #4–#5). Push is optional, so catch, tag it for triage
+  // (not the opaque unhandled-rejection bucket), and degrade to no token.
+  try {
+    const tokenData = await Notifications.getExpoPushTokenAsync(
+      projectId ? { projectId } : {},
+    );
 
-  if (Platform.OS === 'android') {
-    Notifications.setNotificationChannelAsync('default', {
-      name: 'Default',
-      importance: Notifications.AndroidImportance.HIGH,
-      vibrationPattern: [0, 250, 250, 250],
+    if (Platform.OS === 'android') {
+      Notifications.setNotificationChannelAsync('default', {
+        name: 'Default',
+        importance: Notifications.AndroidImportance.HIGH,
+        vibrationPattern: [0, 250, 250, 250],
+      });
+    }
+
+    return tokenData?.data ?? null;
+  } catch (err) {
+    captureError(err, {
+      feature: 'push-registration',
+      op: 'getExpoPushToken',
+      hasProjectId: String(Boolean(projectId)),
     });
+    return null;
   }
-
-  return tokenData.data;
 }
 
 async function savePushToken(userId: string, token: string) {
@@ -91,12 +106,19 @@ export function useNotifications(userId: string | null) {
 
   // Register push token + persist timezone on login
   useEffect(() => {
-    registerForPushNotifications().then((token) => {
-      if (token) {
-        setExpoPushToken(token);
-        if (userId) savePushToken(userId, token);
-      }
-    });
+    registerForPushNotifications()
+      .then((token) => {
+        if (token) {
+          setExpoPushToken(token);
+          if (userId) savePushToken(userId, token);
+        }
+      })
+      // Backstop so a push-registration failure can never become an unhandled
+      // rejection (the opaque bucket). The inner fetch already tags its own
+      // errors; this catches anything else in the chain.
+      .catch((err) =>
+        captureError(err, { feature: 'push-registration', op: 'register' }),
+      );
 
     if (userId) {
       try {

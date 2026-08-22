@@ -3,6 +3,7 @@ import { Tabs } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useTranslation } from 'react-i18next';
 import { useTheme } from '../../src/hooks/useTheme';
+import { haptics } from '../../src/lib/haptics';
 
 export default function TabLayout() {
   const { t } = useTranslation();
@@ -10,6 +11,9 @@ export default function TabLayout() {
 
   return (
     <Tabs
+      // Tab presses were the one navigation surface with no haptic (M3 Wk-3).
+      // A light selection tick on every tab switch, app-wide.
+      screenListeners={{ tabPress: () => haptics.selection() }}
       screenOptions={{
         tabBarActiveTintColor: colors.primary,
         tabBarInactiveTintColor: colors.textTertiary,

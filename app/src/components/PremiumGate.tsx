@@ -2,7 +2,7 @@ import React from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
-import * as Haptics from 'expo-haptics';
+import { haptics } from '../lib/haptics';
 import { usePremium } from '../hooks/usePremium';
 import { useTheme } from '../hooks/useTheme';
 import { borderRadius, spacing, typography } from '../constants/theme';
@@ -35,7 +35,7 @@ export function PremiumLockBanner({ message }: { message?: string }) {
   const { colors: c } = useTheme();
 
   function handlePress() {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    haptics.impact();
     router.push('/paywall');
   }
 
@@ -69,7 +69,7 @@ export function usePremiumGuard(): { isPremium: boolean; requirePremium: () => b
 
   function requirePremium(): boolean {
     if (isPremium) return true;
-    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
+    haptics.warning();
     router.push('/paywall');
     return false;
   }

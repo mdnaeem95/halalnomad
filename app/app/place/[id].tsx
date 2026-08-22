@@ -9,7 +9,7 @@ import {
   View,
 } from 'react-native';
 import { Image } from 'expo-image';
-import * as Haptics from 'expo-haptics';
+import { haptics } from '../../src/lib/haptics';
 import { useTranslation } from 'react-i18next';
 import { useLocalSearchParams, router } from 'expo-router';
 import * as Clipboard from 'expo-clipboard';
@@ -250,7 +250,7 @@ export default function PlaceDetailScreen() {
   }
 
   function handleVerify() {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    haptics.impact("medium");
     if (!user || !place) {
       setDialog({
         visible: true,
@@ -271,7 +271,7 @@ export default function PlaceDetailScreen() {
         { placeId: place.id, userId: user.id, type: 'confirm' },
         {
           onSuccess: () => {
-            Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+            haptics.success();
             showToast('Halal status confirmed! +15 points');
             refreshProfile();
           },
@@ -282,7 +282,7 @@ export default function PlaceDetailScreen() {
   }
 
   function handleSave() {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    haptics.impact();
     if (!user || !place) {
       setDialog({
         visible: true,
@@ -307,7 +307,7 @@ export default function PlaceDetailScreen() {
     }
     try {
       const { title } = saveToTrip.save(place);
-      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      haptics.success();
       showToast(t('trips.savedToast', { name: title }));
       // Announce the state change for VoiceOver users.
       AccessibilityInfo.announceForAccessibility(t('trips.a11ySavedAnnounce', { name: title }));
@@ -354,7 +354,7 @@ export default function PlaceDetailScreen() {
   }
 
   function handleOpenReview() {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    haptics.impact();
     if (!user || !place) {
       setDialog({
         visible: true,
@@ -379,7 +379,7 @@ export default function PlaceDetailScreen() {
       {
         onSuccess: () => {
           setReviewModalVisible(false);
-          Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+          haptics.success();
           showToast('Review submitted! +20 points');
           refreshProfile();
         },
@@ -411,7 +411,7 @@ export default function PlaceDetailScreen() {
 
   async function handleCopyAddress() {
     if (!place) return;
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    haptics.impact();
     const address = place.address_local
       ? `${place.address_en}\n${place.address_local}`
       : place.address_en;
@@ -428,7 +428,7 @@ export default function PlaceDetailScreen() {
 
   async function handleExternalSearch(platform: ExternalPlatform) {
     if (!place) return;
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    haptics.impact();
     const platformName = platform === 'tiktok' ? 'TikTok' : 'Instagram';
     await Clipboard.setStringAsync(place.name_en);
     track(EVENTS.PLACE_EXTERNAL_SEARCH, { platform, place_id: place.id });

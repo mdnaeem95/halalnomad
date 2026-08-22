@@ -9,7 +9,7 @@ import {
   View,
 } from 'react-native';
 import { AccessibilityInfo } from 'react-native';
-import * as Haptics from 'expo-haptics';
+import { haptics } from '../../src/lib/haptics';
 import { FlashList } from '@shopify/flash-list';
 import { Ionicons } from '@expo/vector-icons';
 import { router, useLocalSearchParams } from 'expo-router';
@@ -70,7 +70,7 @@ export default function SearchScreen() {
   }, [params.listId, params.listName]);
 
   function clearScope() {
-    Haptics.selectionAsync();
+    haptics.selection();
     setScope(null);
     // Drop the stale params so re-focusing the tab doesn't resurrect the chip.
     router.setParams({ listId: undefined, listName: undefined });
