@@ -13,7 +13,7 @@ import {
 import { FlashList } from '@shopify/flash-list';
 import MapView, { Marker, PROVIDER_GOOGLE } from 'react-native-maps';
 import { router } from 'expo-router';
-import * as Haptics from 'expo-haptics';
+import { haptics } from '../../src/lib/haptics';
 import { Ionicons } from '@expo/vector-icons';
 import { useLocation } from '../../src/hooks/useLocation';
 import { placeKeys, useNearbyPlaces } from '../../src/hooks/usePlaces';
@@ -123,7 +123,7 @@ export default function ExploreScreen() {
     if (mode !== viewMode) {
       track(EVENTS.VIEW_MODE_CHANGED, { from_mode: viewMode, to_mode: mode });
     }
-    Haptics.selectionAsync();
+    haptics.selection();
     setViewMode(mode);
   }
 
@@ -252,7 +252,7 @@ export default function ExploreScreen() {
           {places.length > 0 && !showCarousel && (
             <Pressable
               style={[styles.placeCount, { backgroundColor: c.surface }]}
-              onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); setShowCarousel(true); }}
+              onPress={() => { haptics.impact(); setShowCarousel(true); }}
             >
               <Ionicons name="restaurant-outline" size={14} color={c.primary} />
               <Text style={[styles.placeCountText, { color: c.primary }]}>
@@ -269,7 +269,7 @@ export default function ExploreScreen() {
             // empty state with a path forward.
             <Pressable
               style={[styles.placeCount, { backgroundColor: c.surface }]}
-              onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); handleToggle('browse'); }}
+              onPress={() => { haptics.impact(); handleToggle('browse'); }}
             >
               <Ionicons name="globe-outline" size={14} color={c.primary} />
               <Text style={[styles.placeCountText, { color: c.primary }]}>

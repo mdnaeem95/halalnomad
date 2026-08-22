@@ -201,6 +201,8 @@ export default {
     a11yMoveUp: 'Move {{name}} up',
     a11yMoveDown: 'Move {{name}} down',
     a11yMovedAnnounce: 'Moved {{name}} to position {{pos}} of {{count}}',
+    a11yMovedInDay: 'Moved {{name}} to position {{pos}} of {{count}} in Day {{day}}',
+    a11yMovedInUngrouped: 'Moved {{name}} to position {{pos}} of {{count}} in Ungrouped',
     searchInTrip: 'Search in {{name}}',
     searchScopeChip: 'In {{name}}',
     a11yScopeChip: 'Searching in {{name}}',

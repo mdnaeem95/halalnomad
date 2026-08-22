@@ -2,7 +2,7 @@ import React from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { Image } from 'expo-image';
 import { Ionicons } from '@expo/vector-icons';
-import * as Haptics from 'expo-haptics';
+import { haptics } from '../lib/haptics';
 import { Place, CUISINE_LABELS, PRICE_LABELS, PLACE_TYPE_LABELS, PLACE_TYPE_ICONS } from '../types';
 import { useTheme } from '../hooks/useTheme';
 import {
@@ -33,7 +33,7 @@ export function PlaceCard({ place, onPress, distance, headerAccessory }: Props) 
   const styles = React.useMemo(() => createStyles(c), [c]);
 
   function handlePress() {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    haptics.impact();
     onPress(place);
   }
 

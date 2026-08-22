@@ -24,7 +24,7 @@ import {
   View,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import * as Haptics from 'expo-haptics';
+import { haptics } from '../lib/haptics';
 import { useTranslation } from 'react-i18next';
 import { useTheme } from '../hooks/useTheme';
 import {
@@ -73,7 +73,7 @@ export function SaveToTripSheet({ visible, place, onClose }: Props) {
   }, [visible]);
 
   function toggle(list: SavedList) {
-    Haptics.selectionAsync();
+    haptics.selection();
     const isMember = listIds.includes(list.id);
     if (isMember) {
       removePlace.mutate({ listId: list.id, placeId: place.id });
@@ -91,7 +91,7 @@ export function SaveToTripSheet({ visible, place, onClose }: Props) {
       // Await the enqueue so list_create precedes the place_add in the queue.
       const row = await createList.createAsync(name, 'manual');
       saveToTrip.mutate({ placeId: place.id, listId: row.id, isFirst: false, title: row.name });
-      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      haptics.success();
       AccessibilityInfo.announceForAccessibility(t('trips.a11ySavedAnnounce', { name: row.name }));
       setDraft('');
       setCreating(false);

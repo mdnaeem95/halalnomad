@@ -22,7 +22,7 @@
 import { AppState } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { onlineManager } from '@tanstack/react-query';
-import { captureError } from './sentry';
+import { captureError, breadcrumb } from './sentry';
 
 export type WriteOp =
   | 'list_create'
@@ -199,7 +199,17 @@ export async function drainWriteQueue(): Promise<void> {
       try {
         await beforeDrain();
       } catch (e) {
-        captureError(e as Error, { area: 'write-queue.beforeDrain' });
+        // "No auth session yet" is benign-by-design: the gate defers the drain
+        // until the session restores, which happens routinely at cold start
+        // before auth settles. It was the single largest Sentry issue (245× and
+        // growing, reviews #4–#5) despite being a non-error. Breadcrumb it and
+        // retry; only genuine gate failures still capture.
+        const msg = e instanceof Error ? e.message : String(e);
+        if (msg.includes('no auth session yet')) {
+          breadcrumb('drain deferred: no auth session yet', 'write-queue');
+        } else {
+          captureError(e as Error, { area: 'write-queue.beforeDrain' });
+        }
         scheduleDrainRetry();
         return;
       }

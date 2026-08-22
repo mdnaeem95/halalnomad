@@ -33,7 +33,7 @@ jest.mock('@react-native-async-storage/async-storage', () => {
     },
   };
 });
-jest.mock('../lib/sentry', () => ({ captureError: jest.fn() }));
+jest.mock('../lib/sentry', () => ({ captureError: jest.fn(), breadcrumb: jest.fn() }));
 
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import {
@@ -45,6 +45,7 @@ import {
   getQueueSnapshot,
   __resetWriteQueueForTests,
 } from '../lib/write-queue';
+import { captureError, breadcrumb } from '../lib/sentry';
 
 beforeEach(async () => {
   await (AsyncStorage as unknown as { clear: () => Promise<void> }).clear();
@@ -172,9 +173,19 @@ describe('B11 repro — offline sheet toggles + create survive kill and all land
       await enqueue('list_create', 'C', { id: 'C', user_id: 'u1', name: 'C', is_default: false });
 
       onlineManager.setOnline(true);
+      (breadcrumb as jest.Mock).mockClear();
+      (captureError as jest.Mock).mockClear();
       await drainWriteQueue(); // gate fails → retry scheduled
       expect(calls).toEqual([]);
       expect(await getQueueSnapshot()).toHaveLength(1); // nothing dropped
+      // Hygiene (M3 Wk-3): the benign "no auth session" gate breadcrumbs, it
+      // does NOT capture as an error — this was the single largest Sentry issue
+      // (245× and growing, reviews #4–#5). Guard against regressing it.
+      expect(breadcrumb).toHaveBeenCalledWith(
+        expect.stringContaining('no auth session'),
+        'write-queue',
+      );
+      expect(captureError).not.toHaveBeenCalled();
 
       sessionReady = true; // session restored during the wait
       await jest.advanceTimersByTimeAsync(10_000);
