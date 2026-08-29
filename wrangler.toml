@@ -11,8 +11,16 @@
 name = "halalnomad"
 compatibility_date = "2024-12-01"
 
+# M4: a tiny Worker handles the one dynamic path — /trip/<token> serves the
+# static web/trip.html for any token. Every other request falls through to the
+# static-asset behaviour unchanged (see worker.js). Verified with `wrangler dev`
+# before first deploy.
+main = "worker.js"
+
 [assets]
 directory = "./web"
+# `binding` exposes the static assets to the Worker (env.ASSETS.fetch).
+binding = "ASSETS"
 # Serve the actual file when a path matches a file. For unknown paths,
 # return Cloudflare's default 404 — we don't need SPA fallback or a
 # custom 404 page for a multi-page static site.

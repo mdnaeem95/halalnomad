@@ -19,9 +19,12 @@
 export default {
   async fetch(request, env) {
     const url = new URL(request.url);
-    // Serve the static share landing for every /trip/<token> path.
+    // Serve the static share landing for every /trip/<token> path. Fetch the
+    // CLEAN path (/trip, not /trip.html) — asset serving 307-redirects the
+    // .html form to extensionless, so /trip.html would bounce; /trip serves
+    // trip.html's content directly (200).
     if (/^\/trip\/[^/]+/.test(url.pathname)) {
-      return env.ASSETS.fetch(new Request(new URL('/trip.html', url), request));
+      return env.ASSETS.fetch(new Request(new URL('/trip', url), request));
     }
     // Everything else: default static-asset resolution (clean URLs, 404s).
     return env.ASSETS.fetch(request);
