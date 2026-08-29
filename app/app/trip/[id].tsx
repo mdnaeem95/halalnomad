@@ -152,7 +152,10 @@ export default function TripDetailScreen() {
       }
       const url = `${SHARE_BASE}${token}`;
       try {
-        const res = await Share.share({ message: t('trips.shareMessage', { name: list.name, url }), url });
+        // The URL lives inside the message (one link, cross-platform). Passing
+        // a separate `url` too makes iOS append it a second time — the "two
+        // links" bug. Message-only keeps it to one on both iOS and Android.
+        const res = await Share.share({ message: t('trips.shareMessage', { name: list.name, url }) });
         if (res.action === Share.sharedAction) {
           track(EVENTS.TRIP_LIST_SHARED, { list_id: id, share_method: 'share_sheet' });
         }
