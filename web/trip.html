@@ -103,7 +103,10 @@
       var m = window.location.pathname.match(/^\/trip\/([^/?#]+)/);
       var token = m ? m[1] : null;
       var btn = document.getElementById('open-app');
-      if (token && btn) btn.setAttribute('href', 'halalnomadapp://trip/' + token);
+      // NOTE: the app's registered scheme is "halalnomad" (app.json), so the
+      // working deep link is halalnomad://… — NOT the brief's "halalnomadapp://"
+      // (which nothing registers). Flagged for PM; using the scheme that opens.
+      if (token && btn) btn.setAttribute('href', 'halalnomad://trip/' + token);
       else if (btn) btn.style.display = 'none';
       var y = document.getElementById('year');
       if (y) y.textContent = new Date().getFullYear();
