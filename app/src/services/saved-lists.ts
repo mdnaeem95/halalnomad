@@ -15,7 +15,7 @@ import { supabase } from '../lib/supabase';
 import { queryClient } from '../lib/query-client';
 import { sanitizeText } from '../lib/sanitize';
 import { registerWriteHandler, onQueueIdle, setBeforeDrain } from '../lib/write-queue';
-import { ListPlace, Place, SavedList } from '../types';
+import { ListPlace, Place, SavedList, SharedTrip } from '../types';
 
 export const LIST_NAME_MAX = 80; // matches the saved_lists_name_len CHECK
 
@@ -148,6 +148,50 @@ export async function updatePlaceDayIndex(
     .eq('list_id', listId)
     .eq('place_id', placeId);
   if (error) throw error;
+}
+
+// --- Share model (M4, migration 026) ---------------------------------------
+
+/** Generate (or reuse) a share token and flip the trip to 'unlisted'. Requires
+ *  network — the token is server-minted and must NOT be queued (a token has no
+ *  meaning offline). The RPC enforces title moderation: a denylisted title
+ *  rejects with Postgres error code 23514 (check_violation), which the caller
+ *  maps to a "rename to share" prompt rather than a generic failure. */
+export async function generateShareToken(listId: string): Promise<string> {
+  const { data, error } = await supabase.rpc('generate_share_token', {
+    p_list_id: listId,
+  });
+  if (error) throw error;
+  return data as string;
+}
+
+/** True when a share failure was the moderation denylist (vs a network/other
+ *  error) — the client shows the rename prompt only for this. */
+export function isShareTitleBlocked(error: unknown): boolean {
+  const code = (error as { code?: string } | null)?.code;
+  return code === '23514'; // check_violation raised by generate_share_token
+}
+
+/** Revoke (or re-enable) sharing by flipping visibility. Token is retained on
+ *  revoke so a later re-share reuses the same link. Owner-only via RLS. */
+export async function setTripVisibility(
+  listId: string,
+  visibility: 'private' | 'unlisted'
+): Promise<void> {
+  const { error } = await supabase
+    .from('saved_lists')
+    .update({ visibility })
+    .eq('id', listId);
+  if (error) throw error;
+}
+
+/** Token-gated read of a shared trip (SECURITY DEFINER RPC). Returns null for a
+ *  wrong token, a private/revoked list, or a non-token id — the token check is
+ *  the authorization, so there's no leak between those cases. */
+export async function getSharedTrip(token: string): Promise<SharedTrip | null> {
+  const { data, error } = await supabase.rpc('get_shared_trip', { p_token: token });
+  if (error) throw error;
+  return (data as SharedTrip | null) ?? null;
 }
 
 /** Set a place's `position` within a trip (M2 Wk3 reorder). Idempotent by

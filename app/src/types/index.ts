@@ -259,6 +259,17 @@ export interface SavedList {
   is_default: boolean;
   created_at: string;
   updated_at: string;
+  // Share model (M4, migration 026). visibility 'public' was cut — never present.
+  share_token?: string | null;
+  visibility?: 'private' | 'unlisted';
+  last_shared_at?: string | null;
+}
+
+// The token-gated read of a shared trip (M4 get_shared_trip RPC). Author is the
+// owner's display name (shown by default, Q3); name is display-capped at 60.
+export interface SharedTrip {
+  list: { id: string; name: string; author: string | null; last_shared_at: string | null };
+  places: ListPlace[];
 }
 
 // A place's membership in a saved_lists trip (the join table, migration 023).

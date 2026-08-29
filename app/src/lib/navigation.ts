@@ -14,7 +14,8 @@ export type PlaceSource =
   | 'city_detail'
   | 'add_dedup'
   | 'notification'
-  | 'trip_detail';
+  | 'trip_detail'
+  | 'shared_trip';
 
 const KNOWN: readonly PlaceSource[] = [
   'explore_map',
@@ -24,6 +25,7 @@ const KNOWN: readonly PlaceSource[] = [
   'add_dedup',
   'notification',
   'trip_detail',
+  'shared_trip',
 ];
 
 /** Build the href for a place detail navigation carrying its source. */

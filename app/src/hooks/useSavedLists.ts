@@ -24,6 +24,9 @@ import {
   fetchSavedPlacePairs,
   fetchSavedListPlaceCounts,
   fetchListPlaces,
+  generateShareToken,
+  setTripVisibility,
+  getSharedTrip,
   SavedPlacePair,
 } from '../services/saved-lists';
 import { enqueue, drainWriteQueue } from '../lib/write-queue';
@@ -31,7 +34,7 @@ import { useAuth } from './useAuth';
 import { uuidv4 } from '../lib/uuid';
 import { captureError } from '../lib/sentry';
 import { track, EVENTS } from '../lib/analytics';
-import { ListPlace, Place, SavedList } from '../types';
+import { ListPlace, Place, SavedList, SharedTrip } from '../types';
 
 // v1 soft cap. Enforced client-side (the screen disables create at the cap and
 // the create() helper throws LIST_CAP_REACHED as a backstop). No server CHECK —
@@ -629,4 +632,67 @@ export function useSaveToTrip() {
   // Avoid creating a duplicate default before the lists query has resolved.
   const ready = listsQuery.isSuccess || !user;
   return { ...mutation, save, ready };
+}
+
+// --- Share model (M4 Wk1) ---------------------------------------------------
+
+export const sharedTripKeys = {
+  all: ['shared-trip'] as const,
+  byToken: (token: string) => ['shared-trip', token] as const,
+};
+
+/** Generate/reuse a share token and flip the trip to 'unlisted'. Sharing needs
+ *  network (server-minted token) — this is NOT a queue-backed mutation; offline
+ *  it errors and the caller shows a "connect to share" state. Returns the token.
+ *  The visibility_changed / shared events fire from the UI, which knows the
+ *  prior visibility and the share method. */
+export function useShareTrip() {
+  const queryClient = useQueryClient();
+  const { user } = useAuth();
+  return useMutation({
+    mutationFn: (listId: string) => generateShareToken(listId),
+    onSuccess: (token, listId) => {
+      // Reflect the new token + visibility in the cached list immediately.
+      if (user) {
+        queryClient.setQueryData<SavedList[]>(savedListKeys.list(user.id), (old = []) =>
+          old.map((l) =>
+            l.id === listId
+              ? { ...l, share_token: token, visibility: 'unlisted', last_shared_at: new Date().toISOString() }
+              : l
+          )
+        );
+      }
+    },
+    onError: (err) => captureError(err as Error, { feature: 'trip-share', op: 'generateToken' }),
+  });
+}
+
+/** Revoke (private) or re-enable (unlisted) sharing. Owner RLS write; token is
+ *  retained on revoke so re-sharing reuses the link. */
+export function useSetTripVisibility() {
+  const queryClient = useQueryClient();
+  const { user } = useAuth();
+  return useMutation({
+    mutationFn: ({ listId, visibility }: { listId: string; visibility: 'private' | 'unlisted' }) =>
+      setTripVisibility(listId, visibility),
+    onSuccess: (_data, { listId, visibility }) => {
+      if (user) {
+        queryClient.setQueryData<SavedList[]>(savedListKeys.list(user.id), (old = []) =>
+          old.map((l) => (l.id === listId ? { ...l, visibility } : l))
+        );
+      }
+    },
+    onError: (err) => captureError(err as Error, { feature: 'trip-share', op: 'setVisibility' }),
+  });
+}
+
+/** Viewer-side read of a shared trip by token. Null = wrong token / private /
+ *  revoked (rendered as a not-found state). Works unauthenticated. */
+export function useSharedTrip(token: string | undefined) {
+  return useQuery<SharedTrip | null>({
+    queryKey: sharedTripKeys.byToken(token ?? ''),
+    queryFn: () => getSharedTrip(token as string),
+    enabled: !!token,
+    staleTime: 5 * 60 * 1000,
+  });
 }

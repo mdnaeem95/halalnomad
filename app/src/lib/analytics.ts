@@ -114,6 +114,14 @@ export const EVENTS = {
   // the section (null = Ungrouped). from_position/to_position are section-local
   // 0-based indices; via:'drag'|'arrows'.
   TRIP_LIST_DAY_REORDERED: 'trip_list_day_reordered',
+  // Trip Planning (M4 Wk1) — share link.
+  // visibility_changed: from/to in ('private','unlisted').
+  TRIP_LIST_VISIBILITY_CHANGED: 'trip_list_visibility_changed',
+  // shared: share_method in ('copy_link','share_sheet').
+  TRIP_LIST_SHARED: 'trip_list_shared',
+  // Fires for the VIEWER of a shared trip (anonymous distinct_id when
+  // unauthenticated); is_authenticated bool, days_since_shared int.
+  SHARED_TRIP_LIST_VIEWED: 'shared_trip_list_viewed',
 
   // Engagement
   LANGUAGE_CHANGED: 'language_changed',

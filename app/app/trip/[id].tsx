@@ -1,12 +1,13 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { AccessibilityInfo, ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { AccessibilityInfo, ActivityIndicator, Alert, Pressable, Share, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { FlashList } from '@shopify/flash-list';
+import * as Clipboard from 'expo-clipboard';
 import { haptics } from '../../src/lib/haptics';
 import { Swipeable } from 'react-native-gesture-handler';
 import { Ionicons } from '@expo/vector-icons';
 import { Stack, router, useLocalSearchParams } from 'expo-router';
 import { useTranslation } from 'react-i18next';
-import { useQueryClient } from '@tanstack/react-query';
+import { useQueryClient, onlineManager } from '@tanstack/react-query';
 import { useTheme } from '../../src/hooks/useTheme';
 import { AppColors } from '../../src/constants/theme';
 import { useLocation } from '../../src/hooks/useLocation';
@@ -17,8 +18,12 @@ import {
   useRemovePlace,
   useReorderPlace,
   useAssignDay,
+  useShareTrip,
+  useSetTripVisibility,
 } from '../../src/hooks/useSavedLists';
+import { isShareTitleBlocked } from '../../src/services/saved-lists';
 import { DayPickerSheet } from '../../src/components/DayPickerSheet';
+import { SharedTripViewer } from '../../src/components/SharedTripViewer';
 import { PlaceCard } from '../../src/components/PlaceCard';
 import { Toast } from '../../src/components/AppDialog';
 import { placeHref } from '../../src/lib/navigation';
@@ -26,6 +31,8 @@ import { haversineKm, formatDistance } from '../../src/lib/distance';
 import { track, EVENTS } from '../../src/lib/analytics';
 import { computeWithinDayMove } from '../../src/lib/trip-reorder';
 import { ListPlace } from '../../src/types';
+
+const SHARE_BASE = 'https://halalnomad.travel/trip/';
 
 export default function TripDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -37,9 +44,15 @@ export default function TripDetailScreen() {
   const queryClient = useQueryClient();
   const { data: lists } = useSavedLists();
   const list = (lists ?? []).find((l) => l.id === id);
+  // Viewer dispatch: once lists have loaded and this id is NOT one we own, the
+  // param is a share token → render the read-only viewer (M4). Anonymous users
+  // have no owned lists, so a share link always lands here for them.
+  const isViewer = !!lists && !list;
   const { data: places, isLoading } = useListPlaces(id);
   const removePlace = useRemovePlace();
   const reorderPlace = useReorderPlace();
+  const shareTrip = useShareTrip();
+  const setVisibility = useSetTripVisibility();
 
   // Reorder edit mode (M2 Wk3). Time-box call, documented in the Wk3 report:
   // free drag on the current gesture stack (FlashList + Swipeable, Animated
@@ -109,7 +122,8 @@ export default function TripDetailScreen() {
   // place_count is accurate).
   const openedRef = useRef(false);
   useEffect(() => {
-    if (id && places && !openedRef.current) {
+    // Owner-only event — a viewer (isViewer) fires shared_trip_list_viewed instead.
+    if (id && places && list && !openedRef.current) {
       openedRef.current = true;
       track(EVENTS.TRIP_LIST_OPENED, {
         list_id: id,
@@ -117,7 +131,78 @@ export default function TripDetailScreen() {
         source_screen: 'tab',
       });
     }
-  }, [id, places]);
+  }, [id, places, list]);
+
+  /** M4 share flow (owner). Needs network (server-minted token) — offline is a
+   *  graceful state, never a queued write. Already-shared trips offer re-share
+   *  or stop-sharing; a denylisted title routes to a rename prompt. */
+  async function handleShare() {
+    if (!id || !list) return;
+    if (!onlineManager.isOnline()) {
+      Alert.alert(t('trips.shareOfflineTitle'), t('trips.shareOfflineMessage'));
+      return;
+    }
+    const doShare = async (token: string, wasPrivate: boolean) => {
+      if (wasPrivate) {
+        track(EVENTS.TRIP_LIST_VISIBILITY_CHANGED, {
+          list_id: id,
+          from_visibility: 'private',
+          to_visibility: 'unlisted',
+        });
+      }
+      const url = `${SHARE_BASE}${token}`;
+      try {
+        const res = await Share.share({ message: t('trips.shareMessage', { name: list.name, url }), url });
+        if (res.action === Share.sharedAction) {
+          track(EVENTS.TRIP_LIST_SHARED, { list_id: id, share_method: 'share_sheet' });
+        }
+      } catch {
+        /* user dismissed — no-op */
+      }
+    };
+    // Already shared → reuse token; offer copy / stop-sharing too.
+    if (list.share_token && list.visibility === 'unlisted') {
+      const token = list.share_token;
+      Alert.alert(t('trips.shareTrip'), t('trips.shareLinkOn'), [
+        { text: t('trips.share'), onPress: () => doShare(token, false) },
+        {
+          text: t('trips.shareCopy'),
+          onPress: async () => {
+            await Clipboard.setStringAsync(`${SHARE_BASE}${token}`);
+            track(EVENTS.TRIP_LIST_SHARED, { list_id: id, share_method: 'copy_link' });
+            setToast({ visible: true, message: t('trips.shareCopied') });
+          },
+        },
+        {
+          text: t('trips.shareTurnOff'),
+          style: 'destructive',
+          onPress: () => {
+            setVisibility.mutate({ listId: id, visibility: 'private' });
+            track(EVENTS.TRIP_LIST_VISIBILITY_CHANGED, {
+              list_id: id,
+              from_visibility: 'unlisted',
+              to_visibility: 'private',
+            });
+          },
+        },
+        { text: t('common.cancel'), style: 'cancel' },
+      ]);
+      return;
+    }
+    // First share (or re-enabling after revoke): mint/reuse token then share.
+    const wasPrivate = list.visibility !== 'unlisted';
+    haptics.selection();
+    shareTrip.mutate(id, {
+      onSuccess: (token) => doShare(token, wasPrivate),
+      onError: (err) => {
+        if (isShareTitleBlocked(err)) {
+          Alert.alert(t('trips.shareTitleBlockedTitle'), t('trips.shareTitleBlockedMessage'));
+        } else {
+          Alert.alert(t('trips.shareOfflineTitle'), t('trips.shareOfflineMessage'));
+        }
+      },
+    });
+  }
 
   function handleRemove(place: ListPlace) {
     if (!id) return;
@@ -224,6 +309,21 @@ export default function TripDetailScreen() {
                 <Ionicons name="search" size={20} color={c.textOnPrimary} />
               </Pressable>
             )}
+            {!editMode && (
+              <Pressable
+                onPress={handleShare}
+                hitSlop={10}
+                style={styles.headerAction}
+                accessibilityRole="button"
+                accessibilityLabel={t('trips.shareTrip')}
+              >
+                <Ionicons
+                  name={list?.visibility === 'unlisted' ? 'share-social' : 'share-social-outline'}
+                  size={20}
+                  color={c.textOnPrimary}
+                />
+              </Pressable>
+            )}
             <Pressable
               onPress={() => {
                 haptics.selection();
@@ -243,6 +343,11 @@ export default function TripDetailScreen() {
           </View>
         )
       : undefined;
+
+  // Read-only viewer dispatch (M4): this id is a share token, not an owned list.
+  if (isViewer && id) {
+    return <SharedTripViewer token={id} />;
+  }
 
   return (
     <View style={styles.container}>
