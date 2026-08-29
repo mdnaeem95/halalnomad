@@ -56,22 +56,21 @@ CREATE UNIQUE INDEX IF NOT EXISTS saved_lists_share_token_uniq
 
 -- 2) Title moderation denylist (Q2) ------------------------------------------
 -- Deliberately conservative + reviewable. A shared title is public-by-link, so
--- refuse obviously-abusive text. Case-insensitive whole-word-ish match. Expand
--- via a follow-up migration as needed — kept as a table so it's data, not code.
-CREATE TABLE IF NOT EXISTS share_title_denylist (term TEXT PRIMARY KEY);
-INSERT INTO share_title_denylist (term) VALUES
-  ('fuck'), ('shit'), ('bitch'), ('cunt'), ('nigger'), ('faggot'), ('retard')
-ON CONFLICT DO NOTHING;
-
+-- refuse obviously-abusive text. Word-boundary, case-insensitive match so
+-- "Scunthorpe"-class false positives are avoided. The list is INLINE (not a
+-- separate table) so the function has no cross-object dependency — a brand-new
+-- RLS-less public table was both fragile to create-time validation and an
+-- unprotected-table smell in Supabase. Expand via a follow-up migration; if it
+-- ever needs to be editable without a migration, promote it to a table in v1.1.
 CREATE OR REPLACE FUNCTION share_title_is_allowed(p_name text)
 RETURNS boolean
 LANGUAGE sql
-STABLE
+IMMUTABLE
 AS $$
   SELECT NOT EXISTS (
-    SELECT 1 FROM share_title_denylist d
-    -- word-boundary match so "Scunthorpe"-class false positives are avoided
-    WHERE lower(p_name) ~ ('\m' || d.term || '\M')
+    SELECT 1
+    FROM unnest(ARRAY['fuck','shit','bitch','cunt','nigger','faggot','retard']) AS term
+    WHERE lower(p_name) ~ ('\m' || term || '\M')
   );
 $$;
 
@@ -180,8 +179,9 @@ SELECT
     WHERE table_name='saved_lists' AND column_name IN ('share_token','visibility','last_shared_at')) AS share_cols,        -- expect 3
   (SELECT count(*) FROM information_schema.table_constraints
     WHERE table_name='saved_lists' AND constraint_name='saved_lists_visibility_chk') AS visibility_chk,                    -- expect 1
-  (SELECT count(*) FROM share_title_denylist) AS denylist_terms,                                                           -- expect 7
-  (SELECT count(*) FROM pg_proc WHERE proname IN ('generate_share_token','get_shared_trip','share_title_is_allowed')) AS rpcs; -- expect 3
+  (SELECT count(*) FROM pg_proc WHERE proname IN ('generate_share_token','get_shared_trip','share_title_is_allowed')) AS rpcs, -- expect 3
+  share_title_is_allowed('Tokyo halal trip') AS clean_ok,   -- expect TRUE
+  share_title_is_allowed('my shit trip')     AS bad_blocked; -- expect FALSE
 
--- Flip to COMMIT once the report reads 3 / 1 / 7 / 3.
+-- Flip to COMMIT once the report reads 3 / 1 / 3 / t / f.
 ROLLBACK;
